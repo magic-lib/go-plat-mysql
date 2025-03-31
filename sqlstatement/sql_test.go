@@ -1,10 +1,12 @@
 package sqlstatement_test
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/magic-lib/go-plat-mysql/sqlstatement"
 	"github.com/magic-lib/go-plat-utils/conv"
 	"testing"
+	"time"
 )
 
 func TestGenerateWhereClause(t *testing.T) {
@@ -162,4 +164,27 @@ func TestInsertSql(t *testing.T) {
 		},
 	}, 0, 0)
 	fmt.Println(a, b, e)
+}
+
+type Table1 struct {
+	CreateTime sql.NullTime   `db:"create_time" json:"create_time"`
+	Name       sql.NullString `db:"name" json:"name"`
+}
+
+func TestNullString(t *testing.T) {
+	aa := Table1{
+		CreateTime: sql.NullTime{Time: time.Now()},
+		Name:       sql.NullString{String: "aaaaa"},
+	}
+
+	sqlBuilder := sqlstatement.NewSqlStruct(
+		sqlstatement.SetColumnTagName("db"),
+		sqlstatement.SetStructData(Table1{}),
+		sqlstatement.SetTableName("table1"),
+	)
+
+	query, columnDataList, err := sqlBuilder.InsertSql(aa)
+
+	fmt.Println(query)
+	fmt.Println(columnDataList, err)
 }

@@ -1,6 +1,8 @@
 package sqlstatement
 
 import (
+	"database/sql"
+	"github.com/magic-lib/go-plat-utils/conv"
 	"github.com/magic-lib/go-plat-utils/utils"
 	"reflect"
 	"strings"
@@ -33,6 +35,21 @@ func StructToColumnsAndValues(in any, convertType string, tagNames ...string) (t
 				continue
 			}
 		}
+		if ti.Kind() == reflect.Struct {
+			if nullVal, ok := value.(sql.NullTime); ok {
+				columnsMap[key] = conv.String(nullVal.Time)
+				continue
+			}
+			if nullVal, ok := value.(sql.NullString); ok {
+				columnsMap[key] = nullVal.String
+				continue
+			}
+			if nullVal, ok := value.(sql.NullBool); ok {
+				columnsMap[key] = nullVal.Bool
+				continue
+			}
+		}
+
 		columnsMap[key] = value
 	}
 
