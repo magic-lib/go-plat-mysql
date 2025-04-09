@@ -2,10 +2,10 @@ package sqlstatement
 
 import (
 	"fmt"
-	"github.com/samber/lo"
 	"github.com/magic-lib/go-plat-utils/cond"
 	"github.com/magic-lib/go-plat-utils/conv"
 	"github.com/magic-lib/go-plat-utils/utils"
+	"github.com/samber/lo"
 	"reflect"
 	"strings"
 )
@@ -176,7 +176,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		return "", []any{}, fmt.Errorf("list is empty")
 	}
 
-	if con.Operator == "" {
+	if con.Operator == "" || con.Operator == "==" {
 		con.Operator = defaultMapOperator
 	}
 

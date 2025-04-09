@@ -5,8 +5,8 @@ go 1.24.1
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/go-sql-driver/mysql v1.9.0
-	github.com/magic-lib/go-plat-startupcfg v1.20250403.3
-	github.com/magic-lib/go-plat-utils v1.20250404.1
+	github.com/magic-lib/go-plat-startupcfg v1.20250405.1
+	github.com/magic-lib/go-plat-utils v1.20250408.1
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/samber/lo v1.49.1
 	xorm.io/core v0.7.3
@@ -31,6 +31,8 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/jimstudt/http-authentication v0.0.0-20140401203705-3eca13d6893a // indirect
 	github.com/jinzhu/copier v0.4.0 // indirect
