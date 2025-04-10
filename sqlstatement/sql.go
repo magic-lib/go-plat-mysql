@@ -24,9 +24,9 @@ type LogicCondition struct {
 }
 
 var (
-	operatorList         = []string{"LIKE", "=", ">=", ">", "<=", "<", "IN", "NOT IN"} // 数据库支持的类型
-	likeUseReplaceList   = []string{"%", "_"}                                          //like需要替换的字符
-	likeUseEscapeList    = []string{"/", "&", "#", "@", "^", "$", "!"}                 //定义可以使用的escape列表
+	operatorList         = []string{"LIKE", "=", "!=", ">=", ">", "<=", "<", "IN", "NOT IN", "IS", "IS NOT"} // 数据库支持的类型
+	likeUseReplaceList   = []string{"%", "_"}                                                                //like需要替换的字符
+	likeUseEscapeList    = []string{"/", "&", "#", "@", "^", "$", "!"}                                       //定义可以使用的escape列表
 	defaultMapOperator   = "="
 	defaultLogicOperator = "AND"
 )
@@ -114,6 +114,7 @@ func (s *Statement) GenerateWhereClause(group LogicCondition) (string, []any) {
 		group.Operator = defaultLogicOperator
 	}
 
+	group.Operator = strings.TrimSpace(group.Operator)
 	group.Operator = strings.ToUpper(group.Operator)
 
 	var parts []string
@@ -147,7 +148,30 @@ func (s *Statement) GenerateWhereClause(group LogicCondition) (string, []any) {
 
 // generateWhereClause 生成 WHERE 语句
 func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, error) {
+	con.Operator = strings.TrimSpace(con.Operator)
 	con.Operator = strings.ToUpper(con.Operator)
+
+	if con.Field == "" {
+		return "", []any{}, nil
+	}
+
+	// 如果Field不含空格表示是字段，则加上`
+	fieldStr := con.Field
+	if strings.ContainsAny(fieldStr, " `()") {
+		if con.Value == nil {
+			return fieldStr, []any{}, nil
+		}
+	} else {
+		fieldStr = fmt.Sprintf("`%s`", con.Field)
+		if con.Value == nil {
+			return "", []any{}, nil
+		}
+	}
+
+	// 判断是否为null字段
+	if con.Operator == "IS" || con.Operator == "IS NOT" {
+		return fmt.Sprintf("%s %s NULL", fieldStr, con.Operator), []any{}, nil
+	}
 
 	//如果val是数组，则operator只能是in
 	if reflect.TypeOf(con.Value).Kind() == reflect.Slice {
@@ -171,7 +195,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 			if con.Operator != "" && con.Operator == "NOT IN" {
 				opt = con.Operator
 			}
-			return fmt.Sprintf("`%s` %s (%s)", con.Field, opt, strings.Join(paramList, ",")), dataList, nil
+			return fmt.Sprintf("%s %s (%s)", fieldStr, opt, strings.Join(paramList, ",")), dataList, nil
 		}
 		return "", []any{}, fmt.Errorf("list is empty")
 	}
@@ -185,13 +209,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		return "", []any{}, fmt.Errorf("operator not support: %s", con.Operator)
 	}
 
-	if con.Operator == "LIKE" {
-		// 这里需要对value进行特殊处理，不能处理，会造成正确的%也会换掉了，就会造成错误
-		//valLike, newVal := s.getSqlColumnForLike(conv.String(con.Value))
-		return fmt.Sprintf("`%s` %s ?", con.Field, con.Operator), []any{con.Value}, nil
-	}
-
-	return fmt.Sprintf("`%s` %s ?", con.Field, con.Operator), []any{con.Value}, nil
+	return fmt.Sprintf("%s %s ?", fieldStr, con.Operator), []any{con.Value}, nil
 }
 
 // buildFieldNames 需要将 `name` 转为 name
