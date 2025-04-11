@@ -7,6 +7,7 @@ import (
 	"github.com/magic-lib/go-plat-utils/utils"
 	"github.com/samber/lo"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -146,6 +147,13 @@ func (s *Statement) GenerateWhereClause(group LogicCondition) (string, []any) {
 	return strings.Join(parts, fmt.Sprintf(" %s ", group.Operator)), dataList
 }
 
+// isValidFieldName 是不是合法的字段名
+func isValidFieldName(name string) bool {
+	pattern := `^[a-zA-Z_][a-zA-Z0-9_]*$`
+	match, _ := regexp.MatchString(pattern, name)
+	return match
+}
+
 // generateWhereClause 生成 WHERE 语句
 func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, error) {
 	con.Operator = strings.TrimSpace(con.Operator)
@@ -157,7 +165,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 
 	// 如果Field不含空格表示是字段，则加上`
 	fieldStr := con.Field
-	if strings.ContainsAny(fieldStr, " `()") {
+	if !isValidFieldName(fieldStr) {
 		if con.Value == nil {
 			return fieldStr, []any{}, nil
 		}
