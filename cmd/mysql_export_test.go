@@ -1,4 +1,4 @@
-package etl_test
+package main_test
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 
 func TestMysqlExport(t *testing.T) {
 	// 打开 JSON 文件
-	file, err := os.Open("batch_mysql_import.json")
+	file, err := os.Open("import.json")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return

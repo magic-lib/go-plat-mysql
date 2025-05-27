@@ -7,6 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/magic-lib/go-plat-mysql/sqlstatement"
 	"github.com/magic-lib/go-plat-utils/conv"
+	"github.com/samber/lo"
 	"time"
 )
 
@@ -136,8 +137,7 @@ func (m *mysqlLogger) successLogRecord(id int64, sucNum int, remark string) erro
 	}
 	return nil
 }
-
-func (m *mysqlLogger) getMaxPageNow(r *logRecord, pageStart, pageEnd int) (int, error) {
+func (m *mysqlLogger) getCurrentMaxPageNow(r *logRecord, pageStart, pageEnd int) (int, error) {
 	selectSql := fmt.Sprintf(`SELECT MAX(page_now) AS page_now FROM %s where database_name=DATABASE() AND table_name='%s' AND status = 'success' AND page_size=%d AND page_now>=%d`, m.logTableName, r.TableName, r.PageSize, pageStart)
 	if pageEnd > 0 {
 		selectSql = fmt.Sprintf(selectSql+` AND page_now<=%d`, pageEnd)
@@ -158,13 +158,58 @@ func (m *mysqlLogger) getMaxPageNow(r *logRecord, pageStart, pageEnd int) (int, 
 	}
 	if mapList[0]["page_now"] == nil {
 		//表示没有记录，没有开始
-		return pageStart, nil
+		if pageStart >= 1 {
+			return pageStart - 1, nil
+		}
+		return 0, nil
 	}
 	pageNow, ok := conv.Int(mapList[0]["page_now"])
 	if ok {
 		return pageNow, nil
 	}
 	return 0, nil
+}
+func (m *mysqlLogger) getAllPageNowErrorLogList(tableName string, pageSize int, pageStart, pageEnd int) ([]int, error) {
+	selectSql := fmt.Sprintf(`SELECT * FROM %s where database_name=DATABASE() AND table_name='%s' AND page_size=%d AND page_now>=%d`, m.logTableName, tableName, pageSize, pageStart)
+	if pageEnd > 0 {
+		selectSql = fmt.Sprintf(selectSql+` AND page_now<=%d`, pageEnd)
+	}
+	selectSql = fmt.Sprintf(selectSql + ` ORDER BY page_now ASC`)
+
+	queryService, err := newMysqlQuery(m.dbConn, 1, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	queryService.SqlQuery = selectSql
+
+	mapList, err := queryService.fetchDataList()
+	if err != nil {
+		return nil, err
+	}
+
+	retMapList := make([]*logRecord, 0)
+
+	if len(mapList) == 0 {
+		return []int{}, nil
+	}
+	err = conv.Unmarshal(mapList, &retMapList)
+	if err != nil {
+		return nil, err
+	}
+
+	errPageNowList := make([]int, 0)
+	for i := pageStart; i <= pageEnd; i++ {
+		pageSuccessData := lo.FindOrElse(retMapList, nil, func(one *logRecord) bool {
+			if one.PageNow == i && one.Status == "success" {
+				return true
+			}
+			return false
+		})
+		if pageSuccessData == nil {
+			errPageNowList = append(errPageNowList, i)
+		}
+	}
+	return errPageNowList, nil
 }
 
 func (m *mysqlLogger) failureLogRecord(id int64, r *logRecord) error {

@@ -18,9 +18,10 @@ type mysqlImport struct {
 	tableName       string
 	columnMap       map[string]*sqlcomm.MysqlColumn
 	columns         []string
+	dstPrimaryKey   string
 }
 
-func newMysqlImport(db *sql.DB, tableName string) (*mysqlImport, error) {
+func newMysqlImport(db *sql.DB, tableName string, dstPrimaryKey string) (*mysqlImport, error) {
 	if db == nil {
 		return nil, fmt.Errorf("数据库连接不能为空")
 	}
@@ -38,9 +39,23 @@ func newMysqlImport(db *sql.DB, tableName string) (*mysqlImport, error) {
 		columnNames = append(columnNames, name)
 	}
 
+	if dstPrimaryKey == "" {
+		_ = lo.FindOrElse(columns, nil, func(column *sqlcomm.MysqlColumn) bool {
+			if column.ColumnKey == "PRI" {
+				dstPrimaryKey = column.ColumnName
+				return true
+			}
+			return false
+		})
+		if dstPrimaryKey == "" {
+			fmt.Println("没有找到目标表的主键")
+		}
+	}
+
 	return &mysqlImport{
 		dbConn:          db,
 		tableName:       tableName,
+		dstPrimaryKey:   dstPrimaryKey,
 		columnMap:       columnMap,
 		columns:         columnNames,
 		ErrorFileSuffix: ".error.log",

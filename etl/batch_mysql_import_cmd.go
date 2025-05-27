@@ -11,6 +11,7 @@ type MySqlImportData struct {
 	SrcMysqlConfig startupcfg.MysqlConfig `json:"src_mysql_config"`
 	DstMysqlConfig startupcfg.MysqlConfig `json:"dst_mysql_config"`
 	LogTableName   string                 `json:"log_table_name"`
+	ErrorFilePath  string                 `json:"error_file_path"`
 	PageLimit      uint                   `json:"page_limit"`
 	TableList      []oneImportTable       `json:"table_list"`
 }
@@ -22,6 +23,7 @@ type oneImportTable struct {
 	SrcPageStart  uint              `json:"src_page_start"`  //从第几页进行查起
 	SrcPageEnd    uint              `json:"src_page_end"`    //并发执行的结束页
 	DstTableName  string            `json:"dst_table_name"`
+	DstPrimaryKey string            `json:"dst_primary_key"`
 	DstColumnMap  map[string]string `json:"dst_column_map"` //需要同步的字段，key为目标表字段名，value为表达式
 }
 
@@ -43,6 +45,7 @@ func (b *batchMySqlTableImportCmd) Start() {
 			ConnCfg: &b.batchMySqlImportData.DstMysqlConfig,
 		})
 		batchExecutor.LogTableName = b.batchMySqlImportData.LogTableName
+		batchExecutor.ErrorFilePath = b.batchMySqlImportData.ErrorFilePath
 		batchExecutor.PageLimit = b.batchMySqlImportData.PageLimit
 
 		batchExecutor.FromPrimaryKey = oneImportTable.SrcPrimaryKey
@@ -51,12 +54,21 @@ func (b *batchMySqlTableImportCmd) Start() {
 		batchExecutor.PageStart = oneImportTable.SrcPageStart
 		batchExecutor.PageEnd = oneImportTable.SrcPageEnd
 		batchExecutor.ToTableName = oneImportTable.DstTableName
+		batchExecutor.DstPrimaryKey = oneImportTable.DstPrimaryKey
 		batchExecutor.ToColumnMap = oneImportTable.DstColumnMap
 
 		err := batchExecutor.batchImport()
 		if err != nil {
 			fmt.Println("批量导入有失败：", err)
 		}
+
+		{ // 检查是否有失败的记录，重新进行导入
+			err = batchExecutor.checkComplete()
+			if err != nil {
+				fmt.Println("检查是否有失败的记录，重新进行导入有失败：", err)
+			}
+		}
+
 		return true, err
 	}, goroutines.AsyncForEachWhileOptions{
 		TotalTimeout:   24 * time.Hour,

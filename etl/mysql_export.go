@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Masterminds/squirrel"
 	"github.com/magic-lib/go-plat-mysql/sqlcomm"
+	"github.com/magic-lib/go-plat-utils/templates"
 	"github.com/magic-lib/go-plat-utils/utils/httputil"
 	"log"
 )
@@ -50,23 +51,51 @@ func (m *mysqlExport) checkFetchDataList() error {
 func (m *mysqlExport) fetchDataList() ([]map[string]any, error) {
 	var sqlQuery = ""
 	var sqlParam []any
-	if m.SqlQuery != "" {
-		sqlQuery = m.SqlQuery
-	} else {
-		sqlBuild := squirrel.Select("*").From(m.TableName)
-		if m.PrimaryKey != "" {
-			sqlBuild = sqlBuild.OrderBy(m.PrimaryKey)
-		}
-		sqlQuery, sqlParam, _ = sqlBuild.ToSql()
-	}
+	var page *httputil.PageModel
 	if m.page.PageSize > 0 {
-		page := &httputil.PageModel{
+		page = &httputil.PageModel{
 			PageNow:  m.page.PageNow,
 			PageSize: m.page.PageSize,
 		}
 		page = page.GetPage(page.PageSize)
-		sqlQuery = fmt.Sprintf("%s LIMIT %d, %d", sqlQuery, page.PageOffset, page.PageSize)
 	}
+
+	if m.TableName != "" {
+		sqlBuild := squirrel.Select("*").From(m.TableName)
+		if m.PrimaryKey != "" {
+			sqlBuild = sqlBuild.OrderBy(m.PrimaryKey)
+		}
+		if page != nil {
+			sqlBuild = sqlBuild.Limit(uint64(page.PageSize)).Offset(uint64(page.PageOffset))
+		}
+		sqlQuery, sqlParam, _ = sqlBuild.ToSql()
+	}
+
+	if m.SqlQuery != "" {
+		if sqlQuery != "" {
+			newSqlQuery := m.SqlQuery
+			queryData := map[string]any{
+				m.TableName: fmt.Sprintf("(%s) AS %s", sqlQuery, m.TableName),
+			}
+			if page != nil {
+				queryData["offset"] = page.PageOffset
+				queryData["limit"] = page.PageSize
+			}
+
+			//匹配了分页查询
+			newSqlQueryTemp, err := templates.Template(newSqlQuery, queryData)
+			if err == nil && newSqlQueryTemp != "" {
+				sqlQuery = newSqlQueryTemp
+			}
+		} else {
+			sqlQuery = m.SqlQuery
+		}
+	}
+
+	if sqlQuery == "" {
+		return nil, fmt.Errorf("查询语句不能为空")
+	}
+
 	rows, err := m.dbConn.Query(sqlQuery, sqlParam...)
 	if err != nil {
 		return nil, fmt.Errorf("执行查询失败: %w", err)

@@ -18,12 +18,14 @@ type batchMySqlTableImport struct {
 	FromSqlQuery   string //自定义查询语句，跨表查询
 	FromTableName  string //查询的表名
 	ToTableName    string //查询的表名
+	DstPrimaryKey  string //查询的表名
 	FromPrimaryKey string //排序字段，避免重复查询，按某一个顺序来进行查询
 	PageStart      uint   //从第几页进行查起
 	PageEnd        uint   //结束页
 	PageLimit      uint   //分页信息，避免一次查询过多
 
-	LogTableName string
+	LogTableName  string
+	ErrorFilePath string
 
 	ToColumnMap map[string]string // 目标表字段和源表字段的映射关系
 
@@ -103,10 +105,11 @@ func (b *batchMySqlTableImport) batchImport() error {
 		return err
 	}
 
-	importExec, err := newMysqlImport(b.toDb, b.ToTableName)
+	importExec, err := newMysqlImport(b.toDb, b.ToTableName, b.DstPrimaryKey)
 	if err != nil {
 		return err
 	}
+	importExec.ErrorFilePrefix = b.ErrorFilePath
 
 	if b.PageLimit == 0 {
 		err = queryData.checkFetchDataList()
@@ -135,8 +138,9 @@ func (b *batchMySqlTableImport) batchImport() error {
 		return err
 	}
 
-	queryData.page = b.getPageModel(logService, b.ToTableName)
-	if queryData.page == nil {
+	var isEnd bool
+	queryData.page, isEnd = b.getPageModel(logService, b.ToTableName)
+	if isEnd {
 		return nil //表示已经查完了
 	}
 
@@ -188,32 +192,76 @@ func (b *batchMySqlTableImport) batchImport() error {
 
 	return nil
 }
+func (b *batchMySqlTableImport) checkComplete() error {
+	if b.toDb == nil {
+		err := b.mysqlDb()
+		if err != nil {
+			return err
+		}
+	}
 
-func (b *batchMySqlTableImport) getPageModel(logService *mysqlLogger, toTableName string) *httputil.PageModel {
+	logService, err := newMysqlLogger(b.toDb, b.LogTableName)
+	if err != nil {
+		return err
+	}
+
+	page, _ := b.getPageModel(logService, b.ToTableName)
+	errPageNowList, err := logService.getAllPageNowErrorLogList(b.ToTableName, int(b.PageLimit), page.PageNow, int(b.PageEnd))
+	if len(errPageNowList) == 0 {
+		return nil
+	}
+
+	pageStart := b.PageStart
+	pageEnd := b.PageEnd
+
+	for _, pageNow := range errPageNowList {
+		if pageNow == 0 {
+			continue
+		}
+		b.PageStart = uint(pageNow)
+		b.PageEnd = uint(pageNow)
+		err = b.batchImport()
+		if err != nil {
+			fmt.Println("批量导入有失败：", err, "当前页:", pageNow)
+		}
+	}
+	b.PageStart = pageStart
+	b.PageEnd = pageEnd
+	return nil
+}
+
+func (b *batchMySqlTableImport) getPageModel(logService *mysqlLogger, toTableName string) (page *httputil.PageModel, isEnd bool) {
 	pageNow := 1
 	if b.PageStart > 0 {
 		pageNow = int(b.PageStart) //手动设置
 	}
 	//根据日志最后一条，查询最大成功的页码
-	num, err := logService.getMaxPageNow(&logRecord{
+	num, err := logService.getCurrentMaxPageNow(&logRecord{
 		TableName: toTableName,
 		PageSize:  int(b.PageLimit),
 	}, pageNow, int(b.PageEnd))
 	if err == nil {
-		if num == 0 {
+		if num != 0 {
 			//表示数据已经查询完毕了
-			return nil
+			if uint(num) >= b.PageEnd && b.PageEnd > 0 {
+				page = &httputil.PageModel{
+					PageNow:  pageNow, // 从第一页开始
+					PageSize: int(b.PageLimit),
+				}
+				page = page.GetPage(page.PageSize)
+				return page, true
+			}
 		}
 		pageNow = num + 1 //从下一页开始查询
 	}
 
-	page := &httputil.PageModel{
+	page = &httputil.PageModel{
 		PageNow:  pageNow, // 从第一页开始
 		PageSize: int(b.PageLimit),
 	}
 	page = page.GetPage(page.PageSize)
 
-	return page
+	return page, false
 }
 
 func (b *batchMySqlTableImport) runOneList(importExec *mysqlImport, queryData *mysqlExport) (bool, int, string, error) {
@@ -232,12 +280,6 @@ func (b *batchMySqlTableImport) runOneList(importExec *mysqlImport, queryData *m
 			isEndQuery = true
 		}
 	}
-	idList := make([]string, len(dataList))
-	if queryData.PrimaryKey != "" {
-		for i, one := range dataList {
-			idList[i] = conv.String(one[queryData.PrimaryKey])
-		}
-	}
 
 	dataList = importExec.defaultExchangeFunc(dataList)
 
@@ -251,6 +293,17 @@ func (b *batchMySqlTableImport) runOneList(importExec *mysqlImport, queryData *m
 	if len(b.ExchangeFuncList) > 0 {
 		for _, exchangeFunc := range b.ExchangeFuncList {
 			dataList = exchangeFunc(dataList)
+		}
+	}
+
+	idList := make([]string, len(dataList))
+	if importExec.dstPrimaryKey != "" {
+		for i, one := range dataList {
+			idList[i] = conv.String(one[importExec.dstPrimaryKey])
+		}
+	} else if queryData.PrimaryKey != "" {
+		for i, one := range dataList {
+			idList[i] = conv.String(one[queryData.PrimaryKey])
 		}
 	}
 
