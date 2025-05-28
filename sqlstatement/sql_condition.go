@@ -2,6 +2,7 @@ package sqlstatement
 
 import (
 	"fmt"
+	"github.com/Masterminds/squirrel"
 	"github.com/magic-lib/go-plat-utils/cond"
 	"github.com/magic-lib/go-plat-utils/conv"
 	"github.com/magic-lib/go-plat-utils/utils"
@@ -200,7 +201,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		if len(dataList) > 0 {
 			//只能为IN，NOT IN
 			opt := "IN"
-			if con.Operator != "" && con.Operator == "NOT IN" {
+			if con.Operator == "NOT IN" {
 				opt = con.Operator
 			}
 			return fmt.Sprintf("%s %s (%s)", fieldStr, opt, strings.Join(paramList, ",")), dataList, nil
@@ -215,6 +216,14 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 	//必须是支持的类型，乱传不支持的类型则跳过
 	if ok, _ := cond.Contains(operatorList, con.Operator); !ok {
 		return "", []any{}, fmt.Errorf("operator not support: %s", con.Operator)
+	}
+
+	//如果是某一个函数，则直接返回
+	if val, ok := con.Value.(squirrel.Sqlizer); ok {
+		sqlStr, tempDataList, err := val.ToSql()
+		if err == nil {
+			return fmt.Sprintf("%s %s %s", fieldStr, con.Operator, sqlStr), tempDataList, nil
+		}
 	}
 
 	return fmt.Sprintf("%s %s ?", fieldStr, con.Operator), []any{con.Value}, nil

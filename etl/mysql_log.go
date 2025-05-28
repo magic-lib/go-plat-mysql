@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Masterminds/squirrel"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/magic-lib/go-plat-mysql/sqlcomm"
 	"github.com/magic-lib/go-plat-mysql/sqlstatement"
 	"github.com/magic-lib/go-plat-utils/conv"
 	"github.com/samber/lo"
@@ -16,14 +17,18 @@ type mysqlLogger struct {
 	dbConn       *sql.DB
 }
 
-// logRecord 定义请求记录结构体
-type logRecord struct {
+// MysqlLogRecord 定义请求记录结构体
+type MysqlLogRecord struct {
 	Id           int64     `json:"id"`
 	DatabaseName string    `json:"database_name"`
 	TableName    string    `json:"table_name"`
+	Method       string    `json:"method"`
 	PageNow      int       `json:"page_now"`
 	PageSize     int       `json:"page_size"`
 	SucNum       int       `json:"suc_num"`
+	FromId       string    `json:"from_id"`
+	EndId        string    `json:"end_id"`
+	SqlWhere     string    `json:"sql_where,omitempty"` //  条件，用于记录pageNow的查询条件模版是什么
 	Extend       string    `json:"extend,omitempty"`
 	Errors       string    `json:"errors,omitempty"`
 	Status       string    `json:"status"`
@@ -31,7 +36,8 @@ type logRecord struct {
 	UpdateTime   time.Time `json:"update_time"`
 }
 
-func newMysqlLogger(db *sql.DB, logTableName string) (*mysqlLogger, error) {
+// NewMysqlLogger 创建日志记录器
+func NewMysqlLogger(db *sql.DB, logTableName string) (*mysqlLogger, error) {
 	if db == nil {
 		return nil, fmt.Errorf("数据库连接不能为空")
 	}
@@ -56,9 +62,13 @@ func (m *mysqlLogger) createLogTable() error {
             id bigint AUTO_INCREMENT PRIMARY KEY,
             database_name VARCHAR(50) NOT NULL,
             table_name VARCHAR(50) NOT NULL,
+            method VARCHAR(50) NOT NULL,
             page_now INT DEFAULT 1,
             page_size INT DEFAULT 0,
             suc_num INT DEFAULT 0,
+            from_id VARCHAR(100) DEFAULT '',
+            end_id VARCHAR(100) DEFAULT '',
+            sql_where TEXT,
             extend TEXT,
             errors TEXT,
             status VARCHAR(20) DEFAULT '',
@@ -66,19 +76,24 @@ func (m *mysqlLogger) createLogTable() error {
             update_time DATETIME
         )
     `, m.logTableName)
-	_, err := m.dbConn.Exec(creatSql)
+	_, err := sqlcomm.MysqlExec(m.dbConn, creatSql)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *mysqlLogger) insertLogRecord(r *logRecord) (int64, error) {
-	_, allColumns, err := sqlstatement.StructToColumnsAndValues(logRecord{
+// InsertLogRecord 插入请求记录
+func (m *mysqlLogger) InsertLogRecord(r *MysqlLogRecord) (int64, error) {
+	_, allColumns, err := sqlstatement.StructToColumnsAndValues(MysqlLogRecord{
 		TableName:  r.TableName,
+		Method:     r.Method,
 		PageNow:    r.PageNow,
 		PageSize:   r.PageSize,
 		Errors:     r.Errors,
+		FromId:     r.FromId,
+		EndId:      r.EndId,
+		SqlWhere:   r.SqlWhere,
 		Extend:     r.Extend,
 		Status:     "start",
 		CreateTime: time.Now(),
@@ -105,7 +120,7 @@ func (m *mysqlLogger) insertLogRecord(r *logRecord) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	result, err := m.dbConn.Exec(insertSql, data...)
+	result, err := sqlcomm.MysqlExec(m.dbConn, insertSql, data...)
 	if err != nil {
 		return 0, err
 	}
@@ -115,14 +130,39 @@ func (m *mysqlLogger) insertLogRecord(r *logRecord) (int64, error) {
 	}
 	return id, nil
 }
-func (m *mysqlLogger) successLogRecord(id int64, sucNum int, remark string) error {
+
+// SuccessLogRecord 成功以后的记录
+func (m *mysqlLogger) SuccessLogRecord(id int64, r *MysqlLogRecord, sqlWhere *sqlstatement.LogicCondition) error {
+	if r == nil {
+		return nil
+	}
+	r.Status = "success"
+	r.SqlWhere = conv.String(sqlWhere)
+	return m.commUpdateLogRecord(id, r)
+}
+
+// FailureLogRecord 失败以后的记录
+func (m *mysqlLogger) FailureLogRecord(id int64, r *MysqlLogRecord, sqlWhere *sqlstatement.LogicCondition) error {
+	if r == nil {
+		return nil
+	}
+	r.Status = "failure"
+	r.SqlWhere = conv.String(sqlWhere)
+	return m.commUpdateLogRecord(id, r)
+}
+
+func (m *mysqlLogger) commUpdateLogRecord(id int64, r *MysqlLogRecord) error {
 	sqlBuilder := sqlstatement.NewSqlStruct(
 		sqlstatement.SetTableName(m.logTableName),
-		sqlstatement.SetStructData(logRecord{}))
+		sqlstatement.SetStructData(MysqlLogRecord{}))
 	updateSql, data, err := sqlBuilder.UpdateSqlWithUpdateMap(map[string]any{
-		"status":      "success",
-		"suc_num":     sucNum,
-		"extend":      remark,
+		"suc_num":     r.SucNum,
+		"from_id":     r.FromId,
+		"end_id":      r.EndId,
+		"sql_where":   r.SqlWhere,
+		"extend":      r.Extend,
+		"errors":      r.Errors,
+		"status":      r.Status,
 		"update_time": time.Now(),
 	}, map[string]any{
 		"id": id,
@@ -131,63 +171,105 @@ func (m *mysqlLogger) successLogRecord(id int64, sucNum int, remark string) erro
 	if err != nil {
 		return err
 	}
-	_, err = m.dbConn.Exec(updateSql, data...)
+	_, err = sqlcomm.MysqlExec(m.dbConn, updateSql, data...)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (m *mysqlLogger) getCurrentMaxPageNow(r *logRecord, pageStart, pageEnd int) (int, error) {
-	selectSql := fmt.Sprintf(`SELECT MAX(page_now) AS page_now FROM %s where database_name=DATABASE() AND table_name='%s' AND status = 'success' AND page_size=%d AND page_now>=%d`, m.logTableName, r.TableName, r.PageSize, pageStart)
+
+func (m *mysqlLogger) getCurrentMaxPageWhere(r *MysqlLogRecord, pageStart, pageEnd int) (sqlstatement.LogicCondition, error) {
+	if r.TableName == "" || r.Method == "" {
+		return sqlstatement.LogicCondition{}, fmt.Errorf("tableName or method is empty")
+	}
+
+	whereCond := sqlstatement.LogicCondition{Conditions: []any{
+		sqlstatement.Condition{
+			Field:    "database_name",
+			Operator: "=",
+			Value:    squirrel.Expr("DATABASE()"),
+		},
+		sqlstatement.Condition{
+			Field:    "table_name",
+			Operator: "=",
+			Value:    r.TableName,
+		},
+		sqlstatement.Condition{
+			Field:    "method",
+			Operator: "=",
+			Value:    r.Method,
+		},
+		sqlstatement.Condition{
+			Field:    "page_size",
+			Operator: "=",
+			Value:    r.PageSize,
+		},
+		sqlstatement.Condition{
+			Field:    "page_now",
+			Operator: ">=",
+			Value:    pageStart,
+		},
+	}, Operator: "AND"}
+
 	if pageEnd > 0 {
-		selectSql = fmt.Sprintf(selectSql+` AND page_now<=%d`, pageEnd)
+		whereCond.Conditions = append(whereCond.Conditions, sqlstatement.Condition{
+			Field:    "page_now",
+			Operator: "<=",
+			Value:    pageEnd,
+		})
 	}
+	return whereCond, nil
 
-	queryService, err := newMysqlQuery(m.dbConn, 1, 0, 0)
+}
+
+func (m *mysqlLogger) FindLogSuccessMaxPageNow(r *MysqlLogRecord, pageStart, pageEnd int) (*MysqlLogRecord, error) {
+	whereCond, err := m.getCurrentMaxPageWhere(r, pageStart, pageEnd)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	queryService.SqlQuery = selectSql
+	whereCond.Conditions = append(whereCond.Conditions, sqlstatement.Condition{
+		Field:    "status",
+		Operator: "=",
+		Value:    "success",
+	})
+	st := sqlstatement.Statement{}
+	whereStr, params := st.GenerateWhereClause(whereCond)
 
-	mapList, err := queryService.fetchDataList()
+	selectSql := fmt.Sprintf(`SELECT * FROM %s where %s ORDER BY page_now DESC LIMIT 1`, m.logTableName, whereStr)
+
+	mapList, err := sqlcomm.MysqlQuery(m.dbConn, selectSql, params...)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if len(mapList) == 0 {
-		return 0, nil
+		return nil, nil
 	}
-	if mapList[0]["page_now"] == nil {
-		//表示没有记录，没有开始
-		if pageStart >= 1 {
-			return pageStart - 1, nil
-		}
-		return 0, nil
+	logRecord := &MysqlLogRecord{}
+	err = conv.Unmarshal(mapList[0], logRecord)
+	if err != nil {
+		return nil, err
 	}
-	pageNow, ok := conv.Int(mapList[0]["page_now"])
-	if ok {
-		return pageNow, nil
-	}
-	return 0, nil
+	return logRecord, nil
 }
-func (m *mysqlLogger) getAllPageNowErrorLogList(tableName string, pageSize int, pageStart, pageEnd int) ([]int, error) {
-	selectSql := fmt.Sprintf(`SELECT * FROM %s where database_name=DATABASE() AND table_name='%s' AND page_size=%d AND page_now>=%d`, m.logTableName, tableName, pageSize, pageStart)
-	if pageEnd > 0 {
-		selectSql = fmt.Sprintf(selectSql+` AND page_now<=%d`, pageEnd)
-	}
-	selectSql = fmt.Sprintf(selectSql + ` ORDER BY page_now ASC`)
-
-	queryService, err := newMysqlQuery(m.dbConn, 1, 0, 0)
+func (m *mysqlLogger) ListPageNowErrorLog(tableName string, method string, pageSize int, pageStart, pageEnd int) ([]int, error) {
+	whereCond, err := m.getCurrentMaxPageWhere(&MysqlLogRecord{
+		TableName: tableName,
+		Method:    method,
+		PageSize:  pageSize,
+	}, pageStart, pageEnd)
 	if err != nil {
 		return nil, err
 	}
-	queryService.SqlQuery = selectSql
+	st := sqlstatement.Statement{}
+	whereStr, params := st.GenerateWhereClause(whereCond)
 
-	mapList, err := queryService.fetchDataList()
+	selectSql := fmt.Sprintf(`SELECT * FROM %s where %s ORDER BY page_now ASC`, m.logTableName, whereStr)
+	mapList, err := sqlcomm.MysqlQuery(m.dbConn, selectSql, params...)
 	if err != nil {
 		return nil, err
 	}
 
-	retMapList := make([]*logRecord, 0)
+	retMapList := make([]*MysqlLogRecord, 0)
 
 	if len(mapList) == 0 {
 		return []int{}, nil
@@ -199,7 +281,7 @@ func (m *mysqlLogger) getAllPageNowErrorLogList(tableName string, pageSize int, 
 
 	errPageNowList := make([]int, 0)
 	for i := pageStart; i <= pageEnd; i++ {
-		pageSuccessData := lo.FindOrElse(retMapList, nil, func(one *logRecord) bool {
+		pageSuccessData := lo.FindOrElse(retMapList, nil, func(one *MysqlLogRecord) bool {
 			if one.PageNow == i && one.Status == "success" {
 				return true
 			}
@@ -210,28 +292,4 @@ func (m *mysqlLogger) getAllPageNowErrorLogList(tableName string, pageSize int, 
 		}
 	}
 	return errPageNowList, nil
-}
-
-func (m *mysqlLogger) failureLogRecord(id int64, r *logRecord) error {
-	sqlBuilder := sqlstatement.NewSqlStruct(
-		sqlstatement.SetTableName(m.logTableName),
-		sqlstatement.SetStructData(logRecord{}))
-	updateSql, data, err := sqlBuilder.UpdateSqlWithUpdateMap(map[string]any{
-		"suc_num":     r.SucNum,
-		"extend":      r.Extend,
-		"errors":      r.Errors,
-		"status":      "failure",
-		"update_time": time.Now(),
-	}, map[string]any{
-		"id": id,
-	})
-
-	if err != nil {
-		return err
-	}
-	_, err = m.dbConn.Exec(updateSql, data...)
-	if err != nil {
-		return err
-	}
-	return nil
 }

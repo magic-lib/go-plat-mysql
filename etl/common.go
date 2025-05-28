@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+const (
+	MysqlMethodImport = "import"
+	MysqlMethodDelete = "delete"
+)
+
 // mysqlDataSource mysql数据源
 type mysqlDataSource struct {
 	Dsn         string                  `json:"dsn"`

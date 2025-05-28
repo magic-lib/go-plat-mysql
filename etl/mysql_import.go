@@ -148,14 +148,10 @@ func (m *mysqlImport) importData(idList []string, pageNow int, dataList []map[st
 		return 0, err
 	}
 
-	sqlSuccessStr := fmt.Sprintf("写入数据成功, num: %%d, pageNow:%d, id: %s-%s time: %s", pageNow, firstCurrId, lastCurrId, conv.String(time.Now()))
+	sqlSuccessStr := fmt.Sprintf("写入数据成功, num: %%d, len: %%d pageNow:%d, id: %s-%s time: %s", pageNow, firstCurrId, lastCurrId, conv.String(time.Now()))
 
-	num, errNum := ret.RowsAffected()
-	if errNum == nil {
-		fmt.Println(fmt.Sprintf(sqlSuccessStr, num))
-		return int(num), nil
-	}
-	fmt.Println(fmt.Sprintf(sqlSuccessStr, num))
+	num, _ := ret.RowsAffected()
+	fmt.Println(fmt.Sprintf(sqlSuccessStr, num, len(dataList)))
 	return len(dataList), nil
 }
 

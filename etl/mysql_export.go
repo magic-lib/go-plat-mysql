@@ -7,7 +7,6 @@ import (
 	"github.com/magic-lib/go-plat-mysql/sqlcomm"
 	"github.com/magic-lib/go-plat-utils/templates"
 	"github.com/magic-lib/go-plat-utils/utils/httputil"
-	"log"
 )
 
 type mysqlExport struct {
@@ -48,7 +47,7 @@ func (m *mysqlExport) checkFetchDataList() error {
 }
 
 // fetchDataList 获取数据列表
-func (m *mysqlExport) fetchDataList() ([]map[string]any, error) {
+func (m *mysqlExport) fetchDataList(lastId int64) ([]map[string]any, error) {
 	var sqlQuery = ""
 	var sqlParam []any
 	var page *httputil.PageModel
@@ -63,7 +62,7 @@ func (m *mysqlExport) fetchDataList() ([]map[string]any, error) {
 	if m.TableName != "" {
 		sqlBuild := squirrel.Select("*").From(m.TableName)
 		if m.PrimaryKey != "" {
-			sqlBuild = sqlBuild.OrderBy(m.PrimaryKey)
+			sqlBuild = sqlBuild.OrderBy(m.PrimaryKey + " ASC")
 		}
 		if page != nil {
 			sqlBuild = sqlBuild.Limit(uint64(page.PageSize)).Offset(uint64(page.PageOffset))
@@ -81,6 +80,9 @@ func (m *mysqlExport) fetchDataList() ([]map[string]any, error) {
 				queryData["offset"] = page.PageOffset
 				queryData["limit"] = page.PageSize
 			}
+			if lastId > 0 && m.PrimaryKey != "" {
+				queryData[m.PrimaryKey] = lastId
+			}
 
 			//匹配了分页查询
 			newSqlQueryTemp, err := templates.Template(newSqlQuery, queryData)
@@ -92,25 +94,5 @@ func (m *mysqlExport) fetchDataList() ([]map[string]any, error) {
 		}
 	}
 
-	if sqlQuery == "" {
-		return nil, fmt.Errorf("查询语句不能为空")
-	}
-
-	rows, err := m.dbConn.Query(sqlQuery, sqlParam...)
-	if err != nil {
-		return nil, fmt.Errorf("执行查询失败: %w", err)
-	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			log.Printf("关闭查询结果集失败: %v", err)
-		}
-	}(rows)
-
-	result, err := sqlcomm.MysqlColumnRowsToMaps(rows)
-	if err != nil {
-		return nil, fmt.Errorf("将查询结果转换为map失败: %w", err)
-	}
-
-	return result, nil
+	return sqlcomm.MysqlQuery(m.dbConn, sqlQuery, sqlParam...)
 }
