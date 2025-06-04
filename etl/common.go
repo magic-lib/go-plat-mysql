@@ -12,6 +12,7 @@ import (
 const (
 	MysqlMethodImport = "import"
 	MysqlMethodDelete = "delete"
+	MysqlMethodModify = "modify"
 )
 
 // mysqlDataSource mysql数据源

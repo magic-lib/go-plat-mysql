@@ -10,7 +10,7 @@ import (
 
 func TestMysqlExport(t *testing.T) {
 	// 打开 JSON 文件
-	file, err := os.Open("import.json")
+	file, err := os.Open("member.json")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return

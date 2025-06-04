@@ -17,7 +17,7 @@ func MysqlConnect(dsn string, timeout time.Duration) (*sql.DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
-		return db, fmt.Errorf("数据库连接测试失败: %w", err)
+		return db, fmt.Errorf("数据库连接测试失败: %s %w", dsn, err)
 	}
 	return db, nil
 }

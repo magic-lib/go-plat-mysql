@@ -23,6 +23,7 @@ type MysqlLogRecord struct {
 	DatabaseName string    `json:"database_name"`
 	TableName    string    `json:"table_name"`
 	Method       string    `json:"method"`
+	StartId      string    `json:"start_id"`
 	PageNow      int       `json:"page_now"`
 	PageSize     int       `json:"page_size"`
 	SucNum       int       `json:"suc_num"`
@@ -63,6 +64,7 @@ func (m *mysqlLogger) createLogTable() error {
             database_name VARCHAR(50) NOT NULL,
             table_name VARCHAR(50) NOT NULL,
             method VARCHAR(50) NOT NULL,
+            start_id VARCHAR(50) DEFAULT '',
             page_now INT DEFAULT 1,
             page_size INT DEFAULT 0,
             suc_num INT DEFAULT 0,
@@ -88,6 +90,7 @@ func (m *mysqlLogger) InsertLogRecord(r *MysqlLogRecord) (int64, error) {
 	_, allColumns, err := sqlstatement.StructToColumnsAndValues(MysqlLogRecord{
 		TableName:  r.TableName,
 		Method:     r.Method,
+		StartId:    r.StartId,
 		PageNow:    r.PageNow,
 		PageSize:   r.PageSize,
 		Errors:     r.Errors,
@@ -200,6 +203,11 @@ func (m *mysqlLogger) getCurrentMaxPageWhere(r *MysqlLogRecord, pageStart, pageE
 			Value:    r.Method,
 		},
 		sqlstatement.Condition{
+			Field:    "start_id",
+			Operator: "=",
+			Value:    r.StartId,
+		},
+		sqlstatement.Condition{
 			Field:    "page_size",
 			Operator: "=",
 			Value:    r.PageSize,
@@ -251,10 +259,11 @@ func (m *mysqlLogger) FindLogSuccessMaxPageNow(r *MysqlLogRecord, pageStart, pag
 	}
 	return logRecord, nil
 }
-func (m *mysqlLogger) ListPageNowErrorLog(tableName string, method string, pageSize int, pageStart, pageEnd int) ([]int, error) {
+func (m *mysqlLogger) ListPageNowErrorLog(tableName string, method string, startId string, pageSize int, pageStart, pageEnd int) ([]int, error) {
 	whereCond, err := m.getCurrentMaxPageWhere(&MysqlLogRecord{
 		TableName: tableName,
 		Method:    method,
+		StartId:   startId,
 		PageSize:  pageSize,
 	}, pageStart, pageEnd)
 	if err != nil {

@@ -43,7 +43,6 @@ func main() {
 			}
 
 			if cmdConfig.ToolsType == etl.MysqlMethodImport {
-
 				importTable := etl.NewMySqlBatchImportTable(jsonData)
 				importTable.Start()
 				return nil
@@ -51,7 +50,13 @@ func main() {
 
 			if cmdConfig.ToolsType == etl.MysqlMethodDelete {
 				importTable := etl.NewMySqlBatchCheckDelete(jsonData)
-				importTable.CheckDelete()
+				importTable.CheckNewOrDelete()
+				return nil
+			}
+
+			if cmdConfig.ToolsType == etl.MysqlMethodModify {
+				importTable := etl.NewMySqlBatchCheckModify(jsonData)
+				importTable.ModifyData()
 				return nil
 			}
 

@@ -3,9 +3,11 @@ package sqlcomm
 import (
 	"database/sql"
 	"fmt"
+	"github.com/magic-lib/go-plat-utils/cond"
 	"github.com/magic-lib/go-plat-utils/conv"
 	"strings"
 	"time"
+	"xorm.io/xorm/schemas"
 )
 
 type MysqlColumn struct {
@@ -136,6 +138,12 @@ func MysqlTableColumns(dbConn *sql.DB, tableName string) ([]*MysqlColumn, error)
 // mysqlColumnDefaultValue 获取字段默认值
 func mysqlColumnDefaultValue(oneColumn *MysqlColumn) any {
 	if oneColumn.ColumnDefault.Valid { // 有默认值，先取默认值
+		if oneColumn.ColumnDefault.String == "CURRENT_TIMESTAMP" {
+			columnType := strings.ToUpper(oneColumn.ColumnType)
+			if ok, _ := cond.Contains([]string{schemas.Date, schemas.Time, schemas.TimeStamp, schemas.DateTime}, columnType); ok {
+				return time.Now()
+			}
+		}
 		return oneColumn.ColumnDefault.String
 	}
 
@@ -148,18 +156,18 @@ func mysqlColumnDefaultValue(oneColumn *MysqlColumn) any {
 		return timeStr
 	}
 
-	dataType := strings.ToLower(oneColumn.DataType)
+	dataType := strings.ToUpper(oneColumn.DataType)
 
 	switch dataType {
-	case "int", "bigint", "smallint", "tinyint":
+	case schemas.Int, schemas.BigInt, schemas.SmallInt, schemas.TinyInt:
 		return 0
-	case "float", "double", "decimal":
+	case schemas.Float, schemas.Double, schemas.Decimal:
 		return 0.0
-	case "char", "varchar", "text", "longtext":
+	case schemas.Char, schemas.Varchar, schemas.Text, schemas.LongText:
 		return ""
-	case "blob", "varbinary":
+	case schemas.Blob, schemas.VarBinary:
 		return ""
-	case "boolean", "bool":
+	case schemas.Boolean, schemas.Bool:
 		return 0
 	default:
 		return "" // 兜底处理
@@ -167,17 +175,17 @@ func mysqlColumnDefaultValue(oneColumn *MysqlColumn) any {
 }
 
 func getDefaultTime(oneColumn *MysqlColumn) (string, bool) {
-	dataType := strings.ToLower(oneColumn.DataType)
-	if dataType == "date" {
+	dataType := strings.ToUpper(oneColumn.DataType)
+	if dataType == schemas.Date {
 		return "1000-01-01", true // MySQL 支持的最小合法日期
 	}
-	if dataType == "time" {
+	if dataType == schemas.Time {
 		return "00:00:00", true
 	}
-	if dataType == "timestamp" {
+	if dataType == schemas.TimeStamp {
 		return "1970-01-01 00:00:01", true
 	}
-	if dataType == "datetime" {
+	if dataType == schemas.DateTime {
 		return "1000-01-01 00:00:00", true
 	}
 	return "", false
@@ -247,6 +255,10 @@ func MysqlColumnRowsToMaps(rows *sql.Rows) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	columnsType, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
 
 	// 创建结果切片
 	var result []map[string]any
@@ -273,18 +285,37 @@ func MysqlColumnRowsToMaps(rows *sql.Rows) ([]map[string]any, error) {
 		for i, colName := range columns {
 			// 获取值的指针
 			val := values[i]
-
 			// 处理空值
 			if val == nil {
 				row[colName] = nil
 				continue
 			}
 
+			valType := columnsType[i]
+
 			// 处理不同类型的值
 			switch v := val.(type) {
 			case []byte:
 				// 字节切片通常是字符串或二进制数据
-				row[colName] = string(v)
+				typeName := valType.DatabaseTypeName()
+
+				if ok, _ := cond.Contains([]string{schemas.Char, schemas.Varchar, schemas.Text, schemas.LongText}, typeName); ok {
+					row[colName] = string(v)
+				} else if ok, _ = cond.Contains([]string{schemas.Bit, schemas.UnsignedBit}, typeName); ok {
+					if len(v) == 1 {
+						isAscII := isPrintableASCII(v)
+						if isAscII {
+							row[colName] = string(v)
+						} else {
+							row[colName] = bitToBool(v)
+						}
+					} else {
+						row[colName] = bitToInt(v)
+					}
+				} else {
+					row[colName] = string(v)
+				}
+
 			case time.Time:
 				// 时间类型，可根据需要格式化为字符串
 				row[colName] = v.Format(time.RFC3339)
@@ -304,4 +335,30 @@ func MysqlColumnRowsToMaps(rows *sql.Rows) ([]map[string]any, error) {
 	}
 
 	return result, nil
+}
+
+// 处理 BIT(1) 类型（布尔值）
+func bitToBool(b []byte) bool {
+	if len(b) == 0 {
+		return false
+	}
+	return b[0] != 0
+}
+
+// 处理多字节 BIT 类型（如 BIT(8), BIT(16) 等）
+func bitToInt(b []byte) uint64 {
+	var result uint64
+	for _, v := range b {
+		result = (result << 8) | uint64(v)
+	}
+	return result
+}
+
+func isPrintableASCII(data []uint8) bool {
+	for _, b := range data {
+		if b < 32 || b > 126 {
+			return false
+		}
+	}
+	return true
 }

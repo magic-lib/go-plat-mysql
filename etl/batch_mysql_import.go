@@ -24,6 +24,7 @@ type batchMySqlTableImport struct {
 	DstPrimaryKey  string //查询的表名
 	FromPrimaryKey string //排序字段，避免重复查询，按某一个顺序来进行查询
 	PageStart      uint   //从第几页进行查起
+	StartId        string //从第行数据开始
 	PageEnd        uint   //结束页
 	PageLimit      uint   //分页信息，避免一次查询过多
 
@@ -33,6 +34,12 @@ type batchMySqlTableImport struct {
 	ToColumnMap map[string]string // 目标表字段和源表字段的映射关系
 
 	ExchangeFuncList []ExchangeFunc
+}
+
+var exchangeFuncMap = map[string]ExchangeFunc{}
+
+func RegisterExchangeFunc(name string, f ExchangeFunc) {
+	exchangeFuncMap[name] = f
 }
 
 type ExchangeFunc func([]map[string]any) []map[string]any
@@ -114,27 +121,31 @@ func (b *batchMySqlTableImport) batchImport() error {
 	}
 	importExec.ErrorFilePrefix = b.ErrorFilePath
 
-	var insertLogRecord = func(lastId int64, pageNow int, pageSize int) (bool, *MysqlLogRecord, error) {
-		id, logErr := logService.InsertLogRecord(&MysqlLogRecord{
-			TableName: b.ToTableName,
-			Method:    MysqlMethodImport,
-			PageNow:   pageNow,
-			PageSize:  pageSize,
-		})
+	var insertLogRecord = func(startId string, pageNow int, pageSize int) (bool, error) {
 		// 全量导入
-		isEndQuery, logRecord, whereCond, tempErr := b.runOneList(importExec, queryData, lastId)
+		isEndQuery, logRecord, whereCond, tempErr := b.importOrUpdateOneList(importExec, queryData, startId)
+		// 表示要插入日志
+		if logRecord != nil {
+			id, logErr := logService.InsertLogRecord(&MysqlLogRecord{
+				TableName: b.ToTableName,
+				Method:    MysqlMethodImport,
+				StartId:   startId,
+				PageNow:   pageNow,
+				PageSize:  pageSize,
+			})
 
-		if logErr == nil {
-			if tempErr != nil {
-				logRecord.Errors = tempErr.Error()
-				_ = logService.FailureLogRecord(id, logRecord, whereCond)
-				fmt.Println("执行runOneList语句时错误: ", tempErr)
-			} else {
-				_ = logService.SuccessLogRecord(id, logRecord, whereCond)
+			if logErr == nil {
+				if tempErr != nil {
+					logRecord.Errors = tempErr.Error()
+					_ = logService.FailureLogRecord(id, logRecord, whereCond)
+					fmt.Println("执行runOneList语句时错误: ", tempErr)
+				} else {
+					_ = logService.SuccessLogRecord(id, logRecord, whereCond)
+				}
 			}
 		}
 
-		return isEndQuery, logRecord, tempErr
+		return isEndQuery, tempErr
 	}
 
 	if b.PageLimit == 0 {
@@ -142,13 +153,12 @@ func (b *batchMySqlTableImport) batchImport() error {
 		if err != nil {
 			return err
 		}
-		_, _, tempErr := insertLogRecord(0, 1, 0)
+		_, tempErr := insertLogRecord(b.StartId, 1, 0)
 		return tempErr
 	}
 
 	var isEnd bool
-	var lastId int64
-	queryData.page, lastId, isEnd = b.getPageModel(logService, b.ToTableName, MysqlMethodImport)
+	queryData.page, isEnd = b.getPageModel(logService, b.ToTableName, MysqlMethodImport, b.StartId)
 	if isEnd {
 		return nil //表示已经查完了
 	}
@@ -166,16 +176,13 @@ func (b *batchMySqlTableImport) batchImport() error {
 				break
 			}
 		}
-		isEndQuery, logRecord, tempErr := insertLogRecord(lastId, queryData.page.PageNow, queryData.page.PageSize)
+		isEndQuery, tempErr := insertLogRecord(b.StartId, queryData.page.PageNow, queryData.page.PageSize)
 
 		if tempErr != nil {
 			globalError = tempErr
 		}
 		if isEndQuery { //如果查不到数据了，则直接跳出
 			break
-		}
-		if logRecord != nil && logRecord.EndId != "" {
-			lastId, _ = conv.Int64(logRecord.EndId)
 		}
 		queryData.page.PageNow++ // 下一页
 	}
@@ -187,8 +194,8 @@ func (b *batchMySqlTableImport) batchImport() error {
 	return nil
 }
 
-// checkDelete 检查目标库是否需要删除数据
-func (b *batchMySqlTableImport) checkDelete() error {
+// checkAddOrDelete 检查目标库是否需要新增或删除数据
+func (b *batchMySqlTableImport) checkAddOrDelete() error {
 	if b.srcDb == nil || b.toDb == nil {
 		err := b.mysqlDb()
 		if err != nil {
@@ -351,6 +358,110 @@ func (b *batchMySqlTableImport) checkDelete() error {
 	//return nil
 }
 
+func (b *batchMySqlTableImport) batchModify() error {
+	if b.srcDb == nil || b.toDb == nil {
+		err := b.mysqlDb()
+		if err != nil {
+			return err
+		}
+	}
+
+	if b.FromPrimaryKey == "" || b.DstPrimaryKey == "" {
+		return fmt.Errorf("主键和目标主键不能为空")
+	}
+	queryData, err := newMysqlQuery(b.srcDb, int(b.PageStart), int(b.PageEnd), int(b.PageLimit))
+	if err != nil {
+		return err
+	}
+
+	queryData.TableName = b.FromTableName
+	queryData.SqlQuery = b.FromSqlQuery
+	queryData.PrimaryKey = b.FromPrimaryKey
+
+	logService, err := NewMysqlLogger(b.toDb, b.LogTableName)
+	if err != nil {
+		return err
+	}
+
+	importExec, err := newMysqlImport(b.toDb, b.ToTableName, b.DstPrimaryKey)
+	if err != nil {
+		return err
+	}
+	importExec.ErrorFilePrefix = b.ErrorFilePath
+
+	var modifyLogRecord = func(startId string, pageNow int, pageSize int) (bool, error) {
+		// 全量导入
+		isEndQuery, logRecord, whereCond, tempErr := b.importOrUpdateOneList(importExec, queryData, startId)
+
+		if logRecord != nil {
+			id, logErr := logService.InsertLogRecord(&MysqlLogRecord{
+				TableName: b.ToTableName,
+				Method:    MysqlMethodModify,
+				StartId:   startId,
+				PageNow:   pageNow,
+				PageSize:  pageSize,
+			})
+
+			if logErr == nil {
+				if tempErr != nil {
+					logRecord.Errors = tempErr.Error()
+					_ = logService.FailureLogRecord(id, logRecord, whereCond)
+					fmt.Println("执行runOneList语句时错误: ", tempErr)
+				} else {
+					_ = logService.SuccessLogRecord(id, logRecord, whereCond)
+				}
+			}
+		}
+
+		return isEndQuery, tempErr
+	}
+
+	if b.PageLimit == 0 {
+		err = queryData.checkFetchDataList()
+		if err != nil {
+			return err
+		}
+		_, tempErr := modifyLogRecord(b.StartId, 1, 0)
+		return tempErr
+	}
+
+	var isEnd bool
+	queryData.page, isEnd = b.getPageModel(logService, b.ToTableName, MysqlMethodModify, b.StartId)
+	if isEnd {
+		return nil //表示已经查完了
+	}
+
+	err = queryData.checkFetchDataList()
+	if err != nil {
+		return err
+	}
+
+	var globalError error
+	for {
+		if queryData.pageEnd > 0 {
+			//表示结束查询了
+			if queryData.page.PageNow > queryData.pageEnd {
+				break
+			}
+		}
+		isEndQuery, tempErr := modifyLogRecord(b.StartId, queryData.page.PageNow, queryData.page.PageSize)
+
+		if tempErr != nil {
+			globalError = tempErr
+		}
+		if isEndQuery { //如果查不到数据了，则直接跳出
+			break
+		}
+		queryData.page.PageNow++ // 下一页
+	}
+
+	if globalError != nil {
+		return globalError
+	}
+
+	return nil
+}
+
 // getFirstOneId 获取第一个id
 func (b *batchMySqlTableImport) getFirstOneId(queryData *mysqlExport) (any, error) {
 	sqlQuery := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s ASC LIMIT 1", b.FromPrimaryKey, b.FromTableName,
@@ -368,7 +479,8 @@ func (b *batchMySqlTableImport) getFirstOneId(queryData *mysqlExport) (any, erro
 	}
 	return nil, nil
 }
-func (b *batchMySqlTableImport) checkComplete() error {
+
+func (b *batchMySqlTableImport) checkComplete(method string, startId string, exec func(b *batchMySqlTableImport) error) error {
 	if b.toDb == nil {
 		err := b.mysqlDb()
 		if err != nil {
@@ -381,8 +493,8 @@ func (b *batchMySqlTableImport) checkComplete() error {
 		return err
 	}
 
-	page, _, _ := b.getPageModel(logService, b.ToTableName, MysqlMethodImport)
-	errPageNowList, err := logService.ListPageNowErrorLog(b.ToTableName, MysqlMethodImport, int(b.PageLimit), page.PageNow, int(b.PageEnd))
+	page, _ := b.getPageModel(logService, b.ToTableName, method, b.StartId)
+	errPageNowList, err := logService.ListPageNowErrorLog(b.ToTableName, method, startId, int(b.PageLimit), page.PageNow, int(b.PageEnd))
 	if len(errPageNowList) == 0 {
 		return nil
 	}
@@ -396,9 +508,9 @@ func (b *batchMySqlTableImport) checkComplete() error {
 		}
 		b.PageStart = uint(pageNow)
 		b.PageEnd = uint(pageNow)
-		err = b.batchImport()
+		err = exec(b)
 		if err != nil {
-			fmt.Println("批量导入有失败：", err, "当前页:", pageNow)
+			fmt.Println("检查完成有失败：", err, "当前页:", pageNow)
 		}
 	}
 	b.PageStart = pageStart
@@ -406,7 +518,7 @@ func (b *batchMySqlTableImport) checkComplete() error {
 	return nil
 }
 
-func (b *batchMySqlTableImport) getPageModel(logService *mysqlLogger, toTableName, method string) (page *httputil.PageModel, lastId int64, isEnd bool) {
+func (b *batchMySqlTableImport) getPageModel(logService *mysqlLogger, toTableName, method string, startId string) (page *httputil.PageModel, isEnd bool) {
 	pageNow := 1
 	if b.PageStart > 0 {
 		pageNow = int(b.PageStart) //手动设置
@@ -414,21 +526,21 @@ func (b *batchMySqlTableImport) getPageModel(logService *mysqlLogger, toTableNam
 	//根据日志最后一条，查询最大成功的页码
 	last, err := logService.FindLogSuccessMaxPageNow(&MysqlLogRecord{
 		TableName: toTableName,
-		PageSize:  int(b.PageLimit),
 		Method:    method,
+		StartId:   startId,
+		PageSize:  int(b.PageLimit),
 	}, pageNow, int(b.PageEnd))
 
 	if err == nil && last != nil {
-		lastId, _ = conv.Int64(last.EndId)
 		pageNowTemp := uint(last.PageNow)
 		//表示数据已经查询完毕了
-		if pageNowTemp > b.PageEnd && b.PageEnd > 0 {
+		if pageNowTemp >= b.PageEnd && b.PageEnd > 0 {
 			page = &httputil.PageModel{
 				PageNow:  pageNow,
 				PageSize: int(b.PageLimit),
 			}
 			page = page.GetPage(page.PageSize)
-			return page, lastId, true
+			return page, true
 		}
 		pageNow = last.PageNow + 1 //从下一页开始查询
 	}
@@ -439,11 +551,17 @@ func (b *batchMySqlTableImport) getPageModel(logService *mysqlLogger, toTableNam
 	}
 	page = page.GetPage(page.PageSize)
 
-	return page, lastId, false
+	return page, false
 }
 
-func (b *batchMySqlTableImport) runOneList(importExec *mysqlImport, queryData *mysqlExport, lastId int64) (bool, *MysqlLogRecord, *sqlstatement.LogicCondition, error) {
-	dataList, err := queryData.fetchDataList(lastId)
+func (b *batchMySqlTableImport) importOrUpdateOneList(importExec *mysqlImport, queryData *mysqlExport, startId string) (bool, *MysqlLogRecord, *sqlstatement.LogicCondition, error) {
+	return b.commRunOneList(importExec, queryData, startId, func(idList []string, dataList []map[string]any, pageNow int) (int, error) {
+		return importExec.importData(idList, pageNow, dataList)
+	})
+}
+
+func (b *batchMySqlTableImport) commRunOneList(importExec *mysqlImport, queryData *mysqlExport, startId string, f func(idList []string, dataList []map[string]any, pageNow int) (int, error)) (bool, *MysqlLogRecord, *sqlstatement.LogicCondition, error) {
+	dataList, err := queryData.fetchDataList(startId)
 
 	logRecord := &MysqlLogRecord{}
 
@@ -452,7 +570,7 @@ func (b *batchMySqlTableImport) runOneList(importExec *mysqlImport, queryData *m
 	}
 
 	if len(dataList) == 0 {
-		return true, logRecord, nil, nil
+		return true, nil, nil, nil
 	}
 
 	isEndQuery := false
@@ -475,6 +593,10 @@ func (b *batchMySqlTableImport) runOneList(importExec *mysqlImport, queryData *m
 		for _, exchangeFunc := range b.ExchangeFuncList {
 			dataList = exchangeFunc(dataList)
 		}
+	}
+	if len(dataList) == 0 {
+		//表示过滤了，不用执行
+		return false, nil, nil, nil
 	}
 
 	idList := make([]string, len(dataList))
@@ -517,7 +639,7 @@ func (b *batchMySqlTableImport) runOneList(importExec *mysqlImport, queryData *m
 
 	}
 
-	sucNum, err := importExec.importData(idList, queryData.page.PageNow, dataList)
+	sucNum, err := f(idList, dataList, queryData.page.PageNow)
 	logRecord = &MysqlLogRecord{
 		SucNum: sucNum,
 		FromId: firstCurrId,

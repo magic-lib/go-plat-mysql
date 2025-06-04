@@ -135,7 +135,7 @@ func (m *mysqlImport) importData(idList []string, pageNow int, dataList []map[st
 	ret, err := m.dbConn.Exec(sqlString, sqlValue...)
 	if err != nil {
 		err = fmt.Errorf("写入数据失败: %w", err)
-		errTemp := m.writeError(conv.String(idList), file)
+		errTemp := m.writeError(conv.String(idList)+"\n"+sqlString+"\n"+conv.String(sqlValue), file)
 		if errTemp != nil {
 			fmt.Println("写入数据错误: ", errTemp, " id:", firstCurrId, "-", lastCurrId)
 		}
@@ -148,7 +148,7 @@ func (m *mysqlImport) importData(idList []string, pageNow int, dataList []map[st
 		return 0, err
 	}
 
-	sqlSuccessStr := fmt.Sprintf("写入数据成功, num: %%d, len: %%d pageNow:%d, id: %s-%s time: %s", pageNow, firstCurrId, lastCurrId, conv.String(time.Now()))
+	sqlSuccessStr := fmt.Sprintf("写入数据成功, num: %%d, len: %%d, pageNow:%d, id: %s-%s time: %s", pageNow, firstCurrId, lastCurrId, conv.String(time.Now()))
 
 	num, _ := ret.RowsAffected()
 	fmt.Println(fmt.Sprintf(sqlSuccessStr, num, len(dataList)))

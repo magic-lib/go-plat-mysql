@@ -47,7 +47,7 @@ func (m *mysqlExport) checkFetchDataList() error {
 }
 
 // fetchDataList 获取数据列表
-func (m *mysqlExport) fetchDataList(lastId int64) ([]map[string]any, error) {
+func (m *mysqlExport) fetchDataList(startId string) ([]map[string]any, error) {
 	var sqlQuery = ""
 	var sqlParam []any
 	var page *httputil.PageModel
@@ -63,6 +63,9 @@ func (m *mysqlExport) fetchDataList(lastId int64) ([]map[string]any, error) {
 		sqlBuild := squirrel.Select("*").From(m.TableName)
 		if m.PrimaryKey != "" {
 			sqlBuild = sqlBuild.OrderBy(m.PrimaryKey + " ASC")
+		}
+		if startId != "" && m.PrimaryKey != "" {
+			sqlBuild = sqlBuild.Where(m.PrimaryKey+" >= ?", startId)
 		}
 		if page != nil {
 			sqlBuild = sqlBuild.Limit(uint64(page.PageSize)).Offset(uint64(page.PageOffset))
@@ -80,8 +83,8 @@ func (m *mysqlExport) fetchDataList(lastId int64) ([]map[string]any, error) {
 				queryData["offset"] = page.PageOffset
 				queryData["limit"] = page.PageSize
 			}
-			if lastId > 0 && m.PrimaryKey != "" {
-				queryData[m.PrimaryKey] = lastId
+			if startId != "" && m.PrimaryKey != "" {
+				queryData[m.PrimaryKey] = startId
 			}
 
 			//匹配了分页查询
