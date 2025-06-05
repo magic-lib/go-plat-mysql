@@ -272,7 +272,7 @@ func (m *mysqlLogger) ListPageNowErrorLog(tableName string, method string, start
 	st := sqlstatement.Statement{}
 	whereStr, params := st.GenerateWhereClause(whereCond)
 
-	selectSql := fmt.Sprintf(`SELECT * FROM %s where %s ORDER BY page_now ASC`, m.logTableName, whereStr)
+	selectSql := fmt.Sprintf(`SELECT page_now, suc_num, status FROM %s where %s ORDER BY page_now ASC`, m.logTableName, whereStr)
 	mapList, err := sqlcomm.MysqlQuery(m.dbConn, selectSql, params...)
 	if err != nil {
 		return nil, err
@@ -288,11 +288,24 @@ func (m *mysqlLogger) ListPageNowErrorLog(tableName string, method string, start
 		return nil, err
 	}
 
+	lastPageNow := retMapList[len(retMapList)-1].PageNow
+
 	errPageNowList := make([]int, 0)
 	for i := pageStart; i <= pageEnd; i++ {
 		pageSuccessData := lo.FindOrElse(retMapList, nil, func(one *MysqlLogRecord) bool {
 			if one.PageNow == i && one.Status == "success" {
-				return true
+				//如果不是最后一页的话，插入的数量必须与pageSize相同才对，避免最后一页数据不足的问题
+				if one.PageNow == lastPageNow {
+					return true
+				}
+				//正常插入
+				if one.SucNum == pageSize {
+					return true
+				}
+				// replace or insert ignore
+				if one.SucNum == 2*pageSize || one.SucNum == 0 {
+					return true
+				}
 			}
 			return false
 		})

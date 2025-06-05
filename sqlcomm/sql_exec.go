@@ -3,6 +3,7 @@ package sqlcomm
 import (
 	"database/sql"
 	"fmt"
+	"github.com/magic-lib/go-plat-utils/conv"
 )
 
 // MysqlQuery 执行查询语句
@@ -13,7 +14,7 @@ func MysqlQuery(dbConn *sql.DB, sqlQuery string, params ...any) ([]map[string]an
 
 	rows, err := dbConn.Query(sqlQuery, params...)
 	if err != nil {
-		return nil, fmt.Errorf("执行查询失败: %w", err)
+		return nil, fmt.Errorf("执行查询失败: sql: %s, param: %s, err: %w", sqlQuery, conv.String(params), err)
 	}
 	defer func(rows *sql.Rows) {
 		err = rows.Close()

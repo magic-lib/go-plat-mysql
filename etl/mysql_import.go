@@ -14,6 +14,7 @@ import (
 type mysqlImport struct {
 	ErrorFilePrefix string `json:"error_file_prefix"`
 	ErrorFileSuffix string `json:"error_file_suffix"`
+	DstInsertType   string `json:"dst_insert_type"` //是insert into 还是 replace into
 	dbConn          *sql.DB
 	tableName       string
 	columnMap       map[string]*sqlcomm.MysqlColumn
@@ -112,11 +113,22 @@ func (m *mysqlImport) importData(idList []string, pageNow int, dataList []map[st
 		allValues = append(allValues, values)
 	})
 
-	stmt := squirrel.Replace(m.tableName).Columns(m.columns...)
-	for _, row := range allValues {
-		stmt = stmt.Values(row...)
+	var sqlString string
+	var sqlValue []any
+	if m.DstInsertType == "insert" {
+		stmt := squirrel.Insert(m.tableName).Options("IGNORE").Columns(m.columns...)
+		for _, row := range allValues {
+			stmt = stmt.Values(row...)
+		}
+		sqlString, sqlValue, err = stmt.ToSql()
+	} else {
+		stmt := squirrel.Replace(m.tableName).Columns(m.columns...)
+		for _, row := range allValues {
+			stmt = stmt.Values(row...)
+		}
+		sqlString, sqlValue, err = stmt.ToSql()
 	}
-	sqlString, sqlValue, err := stmt.ToSql()
+
 	if err != nil {
 		err = fmt.Errorf("生成sql语句失败: %w", err)
 		errTemp := m.writeError(conv.String(idList), file)
@@ -148,10 +160,10 @@ func (m *mysqlImport) importData(idList []string, pageNow int, dataList []map[st
 		return 0, err
 	}
 
-	sqlSuccessStr := fmt.Sprintf("写入数据成功, num: %%d, len: %%d, pageNow:%d, id: %s-%s time: %s", pageNow, firstCurrId, lastCurrId, conv.String(time.Now()))
+	sqlSuccessStr := fmt.Sprintf("写入数据成功, table: %%s, rows_affected: %%d, len: %%d, page_now:%d, id: %s-%s time: %s", pageNow, firstCurrId, lastCurrId, conv.String(time.Now()))
 
 	num, _ := ret.RowsAffected()
-	fmt.Println(fmt.Sprintf(sqlSuccessStr, num, len(dataList)))
+	fmt.Println(fmt.Sprintf(sqlSuccessStr, m.tableName, num, len(dataList)))
 	return len(dataList), nil
 }
 

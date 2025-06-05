@@ -25,6 +25,7 @@ type oneImportTable struct {
 	SrcPageEnd             uint              `json:"src_page_end"`    //并发执行的结束页
 	DstTableName           string            `json:"dst_table_name"`
 	DstPrimaryKey          string            `json:"dst_primary_key"`
+	DstInsertType          string            `json:"dst_insert_type"` //是insert into 还是 replace into
 	DstExchangeFuncKeyList []string          `json:"dst_exchange_func_key_list"`
 	DstColumnMap           map[string]string `json:"dst_column_map"` //需要同步的字段，key为目标表字段名，value为表达式
 }
@@ -59,6 +60,7 @@ func (b *batchMySqlTableImportCmd) Start() {
 		batchExecutor.ToTableName = oneImportTable.DstTableName
 		batchExecutor.DstPrimaryKey = oneImportTable.DstPrimaryKey
 		batchExecutor.ToColumnMap = oneImportTable.DstColumnMap
+		batchExecutor.DstInsertType = oneImportTable.DstInsertType
 
 		if len(oneImportTable.DstExchangeFuncKeyList) > 0 {
 			batchExecutor.ExchangeFuncList = make([]ExchangeFunc, 0)

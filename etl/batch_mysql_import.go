@@ -22,6 +22,7 @@ type batchMySqlTableImport struct {
 	FromTableName  string //查询的表名
 	ToTableName    string //查询的表名
 	DstPrimaryKey  string //查询的表名
+	DstInsertType  string //插入方式,是用insert into 还是 replace into
 	FromPrimaryKey string //排序字段，避免重复查询，按某一个顺序来进行查询
 	PageStart      uint   //从第几页进行查起
 	StartId        string //从第行数据开始
@@ -120,6 +121,7 @@ func (b *batchMySqlTableImport) batchImport() error {
 		return err
 	}
 	importExec.ErrorFilePrefix = b.ErrorFilePath
+	importExec.DstInsertType = b.DstInsertType
 
 	var insertLogRecord = func(startId string, pageNow int, pageSize int) (bool, error) {
 		// 全量导入

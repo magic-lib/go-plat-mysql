@@ -3,6 +3,7 @@ package sqlstatement_test
 import (
 	"database/sql"
 	"fmt"
+	"github.com/Masterminds/squirrel"
 	"github.com/magic-lib/go-plat-mysql/sqlstatement"
 	"github.com/magic-lib/go-plat-utils/conv"
 	"testing"
@@ -184,6 +185,20 @@ func TestNullString(t *testing.T) {
 	)
 
 	query, columnDataList, err := sqlBuilder.InsertSql(aa)
+
+	fmt.Println(query)
+	fmt.Println(columnDataList, err)
+}
+func TestInsertIgnore(t *testing.T) {
+	allValues := make([][]any, 0)
+	allValues = append(allValues, []any{"test", 18})
+	allValues = append(allValues, []any{"test2", 20})
+	stmt := squirrel.Insert("users").Options("IGNORE").Columns("name", "age")
+	for _, row := range allValues {
+		stmt = stmt.Values(row...)
+	}
+
+	query, columnDataList, err := stmt.ToSql()
 
 	fmt.Println(query)
 	fmt.Println(columnDataList, err)
