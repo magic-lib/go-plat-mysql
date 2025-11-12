@@ -7,6 +7,7 @@ import (
 	"github.com/magic-lib/go-plat-utils/conv"
 	"github.com/magic-lib/go-plat-utils/utils"
 	"github.com/samber/lo"
+	"log"
 	"reflect"
 	"regexp"
 	"strings"
@@ -26,9 +27,9 @@ type LogicCondition struct {
 }
 
 var (
-	operatorList         = []string{"LIKE", "=", "!=", ">=", ">", "<=", "<", "IN", "NOT IN", "IS", "IS NOT"} // 数据库支持的类型
-	likeUseReplaceList   = []string{"%", "_"}                                                                //like需要替换的字符
-	likeUseEscapeList    = []string{"/", "&", "#", "@", "^", "$", "!"}                                       //定义可以使用的escape列表
+	operatorList         = []string{"LIKE", "NOT LIKE", "=", "!=", ">=", ">", "<=", "<", "IN", "NOT IN", "IS", "IS NOT"} // 数据库支持的类型
+	likeUseReplaceList   = []string{"%", "_"}                                                                            //like需要替换的字符
+	likeUseEscapeList    = []string{"/", "&", "#", "@", "^", "$", "!"}                                                   //定义可以使用的escape列表
 	defaultMapOperator   = "="
 	defaultLogicOperator = "AND"
 )
@@ -213,9 +214,10 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		con.Operator = defaultMapOperator
 	}
 
-	//必须是支持的类型，乱传不支持的类型则跳过
+	//必须是支持的类型，乱传不支持的类型则报错，不阻止了
 	if ok, _ := cond.Contains(operatorList, con.Operator); !ok {
-		return "", []any{}, fmt.Errorf("operator not support: %s", con.Operator)
+		log.Printf("Error operator not support: %s", con.Operator)
+		//return "", []any{}, fmt.Errorf("operator not support: %s", con.Operator)
 	}
 
 	//如果是某一个函数，则直接返回
