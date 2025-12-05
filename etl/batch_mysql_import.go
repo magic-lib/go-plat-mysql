@@ -620,12 +620,12 @@ func (b *batchMySqlTableImport) commRunOneList(importExec *mysqlImport, queryDat
 
 		//如果主键是数字类型，则取第一个和最后一个，有可能顺序会改变，所以如果是数字，则进行排序比较，确保最小值和最大值
 		if cond.IsNumeric(firstCurrId) && cond.IsNumeric(lastCurrId) {
-			firstCurrIdNum, ok1 := conv.Int64(firstCurrId)
-			lastCurrIdNum, ok2 := conv.Int64(lastCurrId)
-			if ok1 && ok2 {
+			firstCurrIdNum, err1 := conv.Convert[int64](firstCurrId)
+			lastCurrIdNum, err2 := conv.Convert[int64](lastCurrId)
+			if err1 == nil && err2 == nil {
 				lo.ForEach(idList, func(id string, i int) {
-					tempIdNum, ok := conv.Int64(id)
-					if ok {
+					tempIdNum, err3 := conv.Convert[int64](id)
+					if err3 == nil {
 						if tempIdNum < firstCurrIdNum {
 							firstCurrIdNum = tempIdNum
 						}
