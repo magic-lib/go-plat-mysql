@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Masterminds/squirrel"
 	"github.com/samber/lo"
+	"strings"
 )
 
 type SqlStruct struct {
@@ -222,4 +223,27 @@ func (s *SqlStruct) SelectSqlByMap(selectStr string, whereMap map[string]any, of
 	st := new(Statement)
 	sqlStr, values := st.SelectSql(tableName, columns, selectStr, whereMap, offset, limit)
 	return sqlStr, values, nil
+}
+
+// InsertOnDuplicateUpdateSql 插入重复进行更新
+func (s *SqlStruct) InsertOnDuplicateUpdateSql(in any, updateMap map[string]any) (string, []any, error) {
+	if len(updateMap) == 0 {
+		return "", nil, fmt.Errorf("updateMap is empty")
+	}
+
+	insertStr, insertDataList, err := s.InsertSql(in)
+	if err != nil {
+		return "", nil, err
+	}
+	columnList := lo.Keys(updateMap)
+	columnList = addCodeForColumns(columnList)
+
+	updateStr := strings.Join(columnList, "=?,") + "=?"
+	updateDataList := lo.Values(updateMap)
+
+	allSqlStr := fmt.Sprintf("%s ON DUPLICATE KEY UPDATE %s", insertStr, updateStr)
+	allDataList := make([]any, 0)
+	allDataList = append(allDataList, insertDataList...)
+	allDataList = append(allDataList, updateDataList...)
+	return allSqlStr, allDataList, nil
 }

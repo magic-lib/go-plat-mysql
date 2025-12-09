@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/magic-lib/go-plat-startupcfg v1.20250529.2-0.20251107071310-a21e06637437
+	github.com/magic-lib/go-plat-startupcfg v1.20250529.2-0.20251208080431-5cb6ebbc787c
 	github.com/magic-lib/go-plat-utils v1.20251105.2-0.20251205024507-7aae01534474
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/samber/lo v1.49.1

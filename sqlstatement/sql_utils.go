@@ -87,8 +87,8 @@ func getSliceByMap(columnsMap map[string]any) ([]string, []any) {
 func addCodeForColumns(columns []string) []string {
 	newColumns := make([]string, 0)
 	for _, column := range columns {
-		column = strings.ReplaceAll(column, "`", "")
-		newColumns = append(newColumns, "`"+column+"`")
+		newColumn := addCodeForOneColumn(column)
+		newColumns = append(newColumns, newColumn)
 	}
 	return newColumns
 }
