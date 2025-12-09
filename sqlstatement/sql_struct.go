@@ -236,10 +236,16 @@ func (s *SqlStruct) InsertOnDuplicateUpdateSql(in any, updateMap map[string]any)
 		return "", nil, err
 	}
 	columnList := lo.Keys(updateMap)
-	columnList = addCodeForColumns(columnList)
+	updateColumnList := make([]string, 0)
+	updateDataList := make([]any, 0)
+	lo.ForEach(columnList, func(item string, i int) {
+		if val, ok := updateMap[item]; ok {
+			updateColumnList = append(updateColumnList, addCodeForOneColumn(item))
+			updateDataList = append(updateDataList, val)
+		}
+	})
 
-	updateStr := strings.Join(columnList, "=?,") + "=?"
-	updateDataList := lo.Values(updateMap)
+	updateStr := strings.Join(updateColumnList, "=?,") + "=?"
 
 	allSqlStr := fmt.Sprintf("%s ON DUPLICATE KEY UPDATE %s", insertStr, updateStr)
 	allDataList := make([]any, 0)
