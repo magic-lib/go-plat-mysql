@@ -220,11 +220,11 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		//return "", []any{}, fmt.Errorf("operator not support: %s", con.Operator)
 	}
 
-	//如果是某一个函数，则直接返回
+	//如果是某一个函数,子查询，则直接返回
 	if val, ok := con.Value.(squirrel.Sqlizer); ok {
 		sqlStr, tempDataList, err := val.ToSql()
 		if err == nil {
-			return fmt.Sprintf("%s %s %s", fieldStr, con.Operator, sqlStr), tempDataList, nil
+			return fmt.Sprintf("%s %s (%s)", fieldStr, con.Operator, sqlStr), tempDataList, nil
 		}
 	}
 
