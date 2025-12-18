@@ -241,7 +241,7 @@ func (s *SqlStruct) InsertOnDuplicateUpdateSql(in any, updateMap map[string]any)
 	lo.ForEach(columnList, func(item string, i int) {
 		if val, ok := updateMap[item]; ok {
 			updateColumnList = append(updateColumnList, addCodeForOneColumn(item))
-			updateDataList = append(updateDataList, val)
+			updateDataList = append(updateDataList, getSqlValues(val))
 		}
 	})
 

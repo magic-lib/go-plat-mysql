@@ -6,6 +6,7 @@ import (
 	"github.com/magic-lib/go-plat-utils/utils"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // StructToColumnsAndValues 将结构体转换为 SQL 对应的列名列表和值列表
@@ -78,9 +79,16 @@ func getSliceByMap(columnsMap map[string]any) ([]string, []any) {
 
 	for k, v := range columnsMap {
 		columns = append(columns, k)
-		dataList = append(dataList, v)
+		dataList = append(dataList, getSqlValues(v))
 	}
 	return columns, dataList
+}
+
+func getSqlValues(oneValue any) any {
+	if t, ok := oneValue.(time.Time); ok {
+		return conv.String(t)
+	}
+	return oneValue
 }
 
 // addCodeForColumns 为column添加`符号，避免冲突
