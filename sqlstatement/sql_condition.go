@@ -29,44 +29,48 @@ type LogicCondition struct {
 type OperatorType string
 
 const (
-	LogicOperatorAnd              OperatorType = "AND"
-	LogicOperatorOr               OperatorType = "OR"
-	ConditionOperatorLike         OperatorType = "LIKE"
-	ConditionOperatorNotLike      OperatorType = "NOT LIKE"
-	ConditionOperatorIn           OperatorType = "IN"
-	ConditionOperatorNotIn        OperatorType = "NOT IN"
-	ConditionOperatorIs           OperatorType = "IS"
-	ConditionOperatorIsNot        OperatorType = "IS NOT"
-	ConditionOperatorBetween      OperatorType = "BETWEEN"
-	ConditionOperatorNotBetween   OperatorType = "NOT BETWEEN"
-	ConditionOperatorLess         OperatorType = "<"
-	ConditionOperatorLessEqual    OperatorType = "<="
-	ConditionOperatorGreater      OperatorType = ">"
-	ConditionOperatorGreaterEqual OperatorType = ">="
-	ConditionOperatorNotEqual     OperatorType = "!="
-	ConditionOperatorEqual        OperatorType = "="
+	OperatorAnd          OperatorType = "AND"
+	OperatorOr           OperatorType = "OR"
+	OperatorLike         OperatorType = "LIKE"
+	OperatorNotLike      OperatorType = "NOT LIKE"
+	OperatorIn           OperatorType = "IN"
+	OperatorNotIn        OperatorType = "NOT IN"
+	OperatorIs           OperatorType = "IS"
+	OperatorIsNot        OperatorType = "IS NOT"
+	OperatorBetween      OperatorType = "BETWEEN"
+	OperatorNotBetween   OperatorType = "NOT BETWEEN"
+	OperatorLess         OperatorType = "<"
+	OperatorLessEqual    OperatorType = "<="
+	OperatorGreater      OperatorType = ">"
+	OperatorGreaterEqual OperatorType = ">="
+	OperatorNotEqual     OperatorType = "!="
+	OperatorEqual        OperatorType = "="
 )
 
 var (
 	operatorList = []OperatorType{
-		ConditionOperatorLike,
-		ConditionOperatorNotLike,
-		ConditionOperatorIn,
-		ConditionOperatorNotIn,
-		ConditionOperatorIs,
-		ConditionOperatorIsNot,
-		ConditionOperatorBetween,
-		ConditionOperatorNotBetween,
-		ConditionOperatorEqual,
-		ConditionOperatorNotEqual,
-		ConditionOperatorGreaterEqual,
-		ConditionOperatorGreater,
-		ConditionOperatorLessEqual,
-		ConditionOperatorLess,
+		OperatorLike,
+		OperatorNotLike,
+		OperatorIn,
+		OperatorNotIn,
+		OperatorIs,
+		OperatorIsNot,
+		OperatorBetween,
+		OperatorNotBetween,
+		OperatorEqual,
+		OperatorNotEqual,
+		OperatorGreaterEqual,
+		OperatorGreater,
+		OperatorLessEqual,
+		OperatorLess,
 	} // 数据库支持的类型
+	logicOperatorList = []OperatorType{
+		OperatorAnd,
+		OperatorOr,
+	}
 	likeUseReplaceList   = []string{"%", "_"}                          //like需要替换的字符
 	likeUseEscapeList    = []string{"/", "&", "#", "@", "^", "$", "!"} //定义可以使用的escape列表
-	defaultLogicOperator = LogicOperatorAnd
+	defaultLogicOperator = OperatorAnd
 )
 
 type Statement struct {
@@ -141,9 +145,9 @@ func (s *Statement) GenerateWhereClauseByMap(whereMap map[string]any) (string, [
 
 func (s *Statement) getFieldOperator(val any) OperatorType {
 	if reflect.TypeOf(val).Kind() == reflect.Slice {
-		return ConditionOperatorIn
+		return OperatorIn
 	}
-	return ConditionOperatorEqual
+	return OperatorEqual
 }
 
 func (s *Statement) ConvOperator(op any) OperatorType {
@@ -152,14 +156,20 @@ func (s *Statement) ConvOperator(op any) OperatorType {
 	opStr = strings.ToUpper(opStr)
 	return OperatorType(opStr)
 }
+func (s *Statement) getLogicOperator(op any) OperatorType {
+	opStr := conv.String(op)
+	if opStr != "" {
+		opType := s.ConvOperator(opStr)
+		if ok, _ := cond.Contains(logicOperatorList, opType); ok {
+			return opType
+		}
+	}
+	return defaultLogicOperator
+}
 
 // GenerateWhereClause 生成 WHERE 语句
 func (s *Statement) GenerateWhereClause(group LogicCondition) (string, []any) {
-	if group.Operator == "" {
-		group.Operator = defaultLogicOperator
-	}
-
-	group.Operator = s.ConvOperator(group.Operator)
+	group.Operator = s.getLogicOperator(group.Operator)
 
 	var parts []string
 	dataList := make([]any, 0)
@@ -228,7 +238,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 	}
 
 	// 判断是否为null字段
-	if con.Operator == ConditionOperatorIs || con.Operator == ConditionOperatorIsNot {
+	if con.Operator == OperatorIs || con.Operator == OperatorIsNot {
 		return fmt.Sprintf("%s %s NULL", fieldStr, con.Operator), []any{}, nil
 	}
 
@@ -250,8 +260,8 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		}
 		if len(dataList) > 0 {
 			//只能为IN，NOT IN
-			opt := ConditionOperatorIn
-			if con.Operator == ConditionOperatorNotIn {
+			opt := OperatorIn
+			if con.Operator == OperatorNotIn {
 				opt = con.Operator
 			}
 			return fmt.Sprintf("%s %s (%s)", fieldStr, opt, strings.Join(paramList, ",")), dataList, nil
@@ -260,7 +270,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 	}
 
 	if con.Operator == "" || con.Operator == "==" {
-		con.Operator = ConditionOperatorEqual
+		con.Operator = OperatorEqual
 	}
 
 	//必须是支持的类型，乱传不支持的类型则报错，不阻止了
