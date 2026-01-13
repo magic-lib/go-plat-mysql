@@ -16,22 +16,57 @@ import (
 // Condition 表示单个查询条件
 type Condition struct {
 	Field    string
-	Operator string
+	Operator OperatorType
 	Value    any
 }
 
 // LogicCondition 表示逻辑分组
 type LogicCondition struct {
-	Conditions []any  // 可以是 Condition 或 LogicCondition
-	Operator   string // "AND" 或 "OR"
+	Conditions []any        // 可以是 Condition 或 LogicCondition
+	Operator   OperatorType // "AND" 或 "OR"
 }
 
+type OperatorType string
+
+const (
+	LogicOperatorAnd              OperatorType = "AND"
+	LogicOperatorOr               OperatorType = "OR"
+	ConditionOperatorLike         OperatorType = "LIKE"
+	ConditionOperatorNotLike      OperatorType = "NOT LIKE"
+	ConditionOperatorIn           OperatorType = "IN"
+	ConditionOperatorNotIn        OperatorType = "NOT IN"
+	ConditionOperatorIs           OperatorType = "IS"
+	ConditionOperatorIsNot        OperatorType = "IS NOT"
+	ConditionOperatorBetween      OperatorType = "BETWEEN"
+	ConditionOperatorNotBetween   OperatorType = "NOT BETWEEN"
+	ConditionOperatorLess         OperatorType = "<"
+	ConditionOperatorLessEqual    OperatorType = "<="
+	ConditionOperatorGreater      OperatorType = ">"
+	ConditionOperatorGreaterEqual OperatorType = ">="
+	ConditionOperatorNotEqual     OperatorType = "!="
+	ConditionOperatorEqual        OperatorType = "="
+)
+
 var (
-	operatorList         = []string{"LIKE", "NOT LIKE", "=", "!=", ">=", ">", "<=", "<", "IN", "NOT IN", "IS", "IS NOT"} // 数据库支持的类型
-	likeUseReplaceList   = []string{"%", "_"}                                                                            //like需要替换的字符
-	likeUseEscapeList    = []string{"/", "&", "#", "@", "^", "$", "!"}                                                   //定义可以使用的escape列表
-	defaultMapOperator   = "="
-	defaultLogicOperator = "AND"
+	operatorList = []OperatorType{
+		ConditionOperatorLike,
+		ConditionOperatorNotLike,
+		ConditionOperatorIn,
+		ConditionOperatorNotIn,
+		ConditionOperatorIs,
+		ConditionOperatorIsNot,
+		ConditionOperatorBetween,
+		ConditionOperatorNotBetween,
+		ConditionOperatorEqual,
+		ConditionOperatorNotEqual,
+		ConditionOperatorGreaterEqual,
+		ConditionOperatorGreater,
+		ConditionOperatorLessEqual,
+		ConditionOperatorLess,
+	} // 数据库支持的类型
+	likeUseReplaceList   = []string{"%", "_"}                          //like需要替换的字符
+	likeUseEscapeList    = []string{"/", "&", "#", "@", "^", "$", "!"} //定义可以使用的escape列表
+	defaultLogicOperator = LogicOperatorAnd
 )
 
 type Statement struct {
@@ -104,11 +139,18 @@ func (s *Statement) GenerateWhereClauseByMap(whereMap map[string]any) (string, [
 	return s.GenerateWhereClause(oneLogicCondition)
 }
 
-func (s *Statement) getFieldOperator(val any) string {
+func (s *Statement) getFieldOperator(val any) OperatorType {
 	if reflect.TypeOf(val).Kind() == reflect.Slice {
-		return "IN"
+		return ConditionOperatorIn
 	}
-	return defaultMapOperator
+	return ConditionOperatorEqual
+}
+
+func (s *Statement) ConvOperator(op any) OperatorType {
+	opStr := conv.String(op)
+	opStr = strings.TrimSpace(opStr)
+	opStr = strings.ToUpper(opStr)
+	return OperatorType(opStr)
 }
 
 // GenerateWhereClause 生成 WHERE 语句
@@ -117,8 +159,7 @@ func (s *Statement) GenerateWhereClause(group LogicCondition) (string, []any) {
 		group.Operator = defaultLogicOperator
 	}
 
-	group.Operator = strings.TrimSpace(group.Operator)
-	group.Operator = strings.ToUpper(group.Operator)
+	group.Operator = s.ConvOperator(group.Operator)
 
 	var parts []string
 	dataList := make([]any, 0)
@@ -158,8 +199,7 @@ func isValidFieldName(name string) bool {
 
 // generateWhereClause 生成 WHERE 语句
 func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, error) {
-	con.Operator = strings.TrimSpace(con.Operator)
-	con.Operator = strings.ToUpper(con.Operator)
+	con.Operator = s.ConvOperator(con.Operator)
 
 	if con.Field == "" {
 		//如果value是一个复杂结构
@@ -188,7 +228,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 	}
 
 	// 判断是否为null字段
-	if con.Operator == "IS" || con.Operator == "IS NOT" {
+	if con.Operator == ConditionOperatorIs || con.Operator == ConditionOperatorIsNot {
 		return fmt.Sprintf("%s %s NULL", fieldStr, con.Operator), []any{}, nil
 	}
 
@@ -210,8 +250,8 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		}
 		if len(dataList) > 0 {
 			//只能为IN，NOT IN
-			opt := "IN"
-			if con.Operator == "NOT IN" {
+			opt := ConditionOperatorIn
+			if con.Operator == ConditionOperatorNotIn {
 				opt = con.Operator
 			}
 			return fmt.Sprintf("%s %s (%s)", fieldStr, opt, strings.Join(paramList, ",")), dataList, nil
@@ -220,7 +260,7 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 	}
 
 	if con.Operator == "" || con.Operator == "==" {
-		con.Operator = defaultMapOperator
+		con.Operator = ConditionOperatorEqual
 	}
 
 	//必须是支持的类型，乱传不支持的类型则报错，不阻止了
