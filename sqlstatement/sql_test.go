@@ -189,6 +189,41 @@ func TestNullString(t *testing.T) {
 	fmt.Println(query)
 	fmt.Println(columnDataList, err)
 }
+func TestNullStringList(t *testing.T) {
+	aa := []Table1{
+		{
+			CreateTime: sql.NullTime{
+				Time:  time.Now(),
+				Valid: true,
+			},
+			Name: sql.NullString{
+				String: "aaaaa",
+				Valid:  true,
+			},
+		},
+		{
+			CreateTime: sql.NullTime{
+				Time:  time.Now(),
+				Valid: true,
+			},
+			Name: sql.NullString{
+				String: "bbbbb",
+				Valid:  true,
+			},
+		},
+	}
+
+	sqlBuilder := sqlstatement.NewSqlStruct(
+		sqlstatement.SetColumnTagName("db"),
+		sqlstatement.SetStructData(Table1{}),
+		sqlstatement.SetTableName("table1"),
+	)
+
+	query, columnDataList, err := sqlBuilder.InsertSql(aa)
+
+	fmt.Println(query)
+	fmt.Println(columnDataList, err)
+}
 func TestInsertIgnore(t *testing.T) {
 	allValues := make([][]any, 0)
 	allValues = append(allValues, []any{"test", 18})

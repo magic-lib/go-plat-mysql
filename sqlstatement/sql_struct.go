@@ -3,6 +3,8 @@ package sqlstatement
 import (
 	"fmt"
 	"github.com/Masterminds/squirrel"
+	"github.com/magic-lib/go-plat-utils/cond"
+	"github.com/magic-lib/go-plat-utils/conv"
 	"github.com/samber/lo"
 	"strings"
 )
@@ -75,6 +77,12 @@ func (s *SqlStruct) commGetTableNameAndColumns(in any) (string, map[string]any, 
 
 // InsertSql 插入的sql语句
 func (s *SqlStruct) InsertSql(in any) (string, []any, error) {
+	if cond.IsArray(in) {
+		inList, err := conv.Convert[[]any](in)
+		if err == nil {
+			return s.insertSqlList(inList)
+		}
+	}
 	tableName, columnMap, err := s.commGetTableNameAndColumns(in)
 	if err != nil {
 		return "", nil, err
@@ -82,6 +90,30 @@ func (s *SqlStruct) InsertSql(in any) (string, []any, error) {
 	columns, values := getSliceByMap(columnMap)
 	columns = addCodeForColumns(columns)
 	return squirrel.Insert(tableName).Columns(columns...).Values(values...).ToSql()
+}
+
+// insertSqlList 插入的sql语句
+func (s *SqlStruct) insertSqlList(inList []any) (string, []any, error) {
+	if len(inList) == 0 {
+		return "", nil, fmt.Errorf("inList is empty")
+	}
+	tableName, columnMap, err := s.commGetTableNameAndColumns(inList[0])
+	if err != nil {
+		return "", nil, err
+	}
+	columns, _ := getSliceByMap(columnMap)
+	columns = addCodeForColumns(columns)
+
+	query := squirrel.Insert(tableName).Columns(columns...)
+	for _, in := range inList {
+		_, oneColumnMap, err := s.commGetTableNameAndColumns(in)
+		if err != nil {
+			return "", nil, err
+		}
+		_, values := getSliceByMap(oneColumnMap)
+		query = query.Values(values...)
+	}
+	return query.ToSql()
 }
 
 // InsertSqlByMap 插入的sql语句
