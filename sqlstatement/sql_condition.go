@@ -241,23 +241,18 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 	if con.Operator == OperatorIs || con.Operator == OperatorIsNot {
 		return fmt.Sprintf("%s %s NULL", fieldStr, con.Operator), []any{}, nil
 	}
+	if con.Operator == OperatorBetween || con.Operator == OperatorNotBetween {
+		//时间是前闭后开，其它都是前闭后闭
+		paramList, dataList := s.buildFieldList(con.Value, false)
+		if len(paramList) != 2 && len(dataList) != 2 {
+			return "", []any{}, fmt.Errorf("between param is not 2 value")
+		}
+		return fmt.Sprintf("%s %s %s", fieldStr, con.Operator, strings.Join(paramList, " AND ")), dataList, nil
+	}
 
 	//如果val是数组，则operator只能是in
 	if reflect.TypeOf(con.Value).Kind() == reflect.Slice {
-		s := reflect.ValueOf(con.Value)
-		//需要去重处理
-		paramList := make([]string, 0)
-		dataList := make([]any, 0)
-		onlyArray := make([]string, 0)
-		for i := 0; i < s.Len(); i++ {
-			ele := s.Index(i).Interface()
-			tempOne := conv.String(ele)
-			if ret, _ := cond.Contains(onlyArray, tempOne); !ret {
-				onlyArray = utils.AppendUniq(onlyArray, tempOne)
-				paramList = append(paramList, "?")
-				dataList = append(dataList, ele)
-			}
-		}
+		paramList, dataList := s.buildFieldList(con.Value, true)
 		if len(dataList) > 0 {
 			//只能为IN，NOT IN
 			opt := OperatorIn
@@ -288,6 +283,33 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 	}
 
 	return fmt.Sprintf("%s %s ?", fieldStr, con.Operator), []any{con.Value}, nil
+}
+
+func (s *Statement) buildFieldList(value any, isUniq bool) ([]string, []any) {
+	vKind := reflect.TypeOf(value).Kind()
+	if vKind != reflect.Slice && vKind != reflect.Array {
+		return []string{}, []any{}
+	}
+	vValue := reflect.ValueOf(value)
+	//需要去重处理
+	paramList := make([]string, 0)
+	dataList := make([]any, 0)
+	onlyArray := make([]string, 0)
+	for i := 0; i < vValue.Len(); i++ {
+		ele := vValue.Index(i).Interface()
+		tempOne := conv.String(ele)
+		if isUniq {
+			if ret, _ := cond.Contains(onlyArray, tempOne); !ret {
+				onlyArray = utils.AppendUniq(onlyArray, tempOne)
+				paramList = append(paramList, "?")
+				dataList = append(dataList, ele)
+			}
+		} else {
+			paramList = append(paramList, "?")
+			dataList = append(dataList, ele)
+		}
+	}
+	return paramList, dataList
 }
 
 // buildFieldNames 需要将 `name` 转为 name
