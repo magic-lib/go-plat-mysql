@@ -144,6 +144,7 @@ func (s *Statement) GenerateWhereClauseByMap(whereMap map[string]any) (string, [
 }
 
 func (s *Statement) getFieldOperator(val any) OperatorType {
+	// map 里默认为in和=
 	if reflect.TypeOf(val).Kind() == reflect.Slice {
 		return OperatorIn
 	}

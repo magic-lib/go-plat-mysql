@@ -79,12 +79,12 @@ func getSliceByMap(columnsMap map[string]any) ([]string, []any) {
 
 	for k, v := range columnsMap {
 		columns = append(columns, k)
-		dataList = append(dataList, getSqlValues(v))
+		dataList = append(dataList, getSqlValues(k, v))
 	}
 	return columns, dataList
 }
 
-func getSqlValues(oneValue any) any {
+func getSqlValues(columnName string, oneValue any) any {
 	if t, ok := oneValue.(time.Time); ok {
 		return conv.String(t)
 	}

@@ -1,6 +1,7 @@
 package sqlstatement
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/Masterminds/squirrel"
 	"github.com/magic-lib/go-plat-utils/cond"
@@ -10,8 +11,9 @@ import (
 )
 
 type SqlStruct struct {
-	structData                any    //通过这个可以直接获得mysql数据结构
-	tableName                 string //表名
+	structData                any           //通过这个可以直接获得mysql数据结构
+	tableName                 string        //表名
+	columnList                []*ColumnInfo //表字段信息
 	convertTableAndColumnType string
 	columnTagName             string
 }
@@ -48,6 +50,52 @@ func SetStructData(d any) Option {
 	return func(s *SqlStruct) {
 		s.structData = d
 	}
+}
+
+// SetColumnList 设置获取字段的类型
+func SetColumnList(db *sql.DB, tableName string) Option {
+	return func(s *SqlStruct) {
+		if db == nil {
+			return
+		}
+		if s.tableName != "" {
+			tableName = s.tableName
+		}
+
+		columns, err := getTableColumns(db, tableName)
+		if err == nil && len(columns) > 0 {
+			s.columnList = columns
+		}
+	}
+}
+
+func (s *SqlStruct) getDataTypeByName(columnName string) string {
+	if len(s.columnList) == 0 || columnName == "" {
+		return ""
+	}
+	columnData, ok := lo.Find(s.columnList, func(item *ColumnInfo) bool {
+		if item.ColumnName == columnName {
+			return true
+		}
+		return false
+	})
+	if ok && columnData != nil {
+		return strings.ToLower(columnData.DataType)
+	}
+	return ""
+}
+
+// buildMapForInsertOrUpdate 处理insert和update 默认处理json类型的问题
+func (s *SqlStruct) buildMapForInsertOrUpdate(columnsMap map[string]any) map[string]any {
+	for k, v := range columnsMap {
+		dataType := s.getDataTypeByName(k)
+		if dataType == "json" {
+			if conv.String(v) == "" {
+				columnsMap[k] = "{}"
+			}
+		}
+	}
+	return columnsMap
 }
 
 func (s *SqlStruct) commGetTableNameAndColumns(in any) (string, map[string]any, error) {
@@ -87,6 +135,7 @@ func (s *SqlStruct) InsertSql(in any) (string, []any, error) {
 	if err != nil {
 		return "", nil, err
 	}
+	columnMap = s.buildMapForInsertOrUpdate(columnMap)
 	columns, values := getSliceByMap(columnMap)
 	columns = addCodeForColumns(columns)
 	return squirrel.Insert(tableName).Columns(columns...).Values(values...).ToSql()
@@ -110,6 +159,7 @@ func (s *SqlStruct) insertSqlList(inList []any) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
+		oneColumnMap = s.buildMapForInsertOrUpdate(oneColumnMap)
 		_, values := getSliceByMap(oneColumnMap)
 		query = query.Values(values...)
 	}
@@ -174,6 +224,7 @@ func (s *SqlStruct) UpdateSql(in any, columns []string, whereCondition LogicCond
 			}
 		})
 	}
+	updateMap = s.buildMapForInsertOrUpdate(updateMap)
 	newUpdateMap := make(map[string]any)
 	for k, v := range updateMap {
 		newUpdateMap[addCodeForOneColumn(k)] = v
@@ -270,10 +321,11 @@ func (s *SqlStruct) InsertOnDuplicateUpdateSql(in any, updateMap map[string]any)
 	columnList := lo.Keys(updateMap)
 	updateColumnList := make([]string, 0)
 	updateDataList := make([]any, 0)
+	updateMap = s.buildMapForInsertOrUpdate(updateMap)
 	lo.ForEach(columnList, func(item string, i int) {
 		if val, ok := updateMap[item]; ok {
 			updateColumnList = append(updateColumnList, addCodeForOneColumn(item))
-			updateDataList = append(updateDataList, getSqlValues(val))
+			updateDataList = append(updateDataList, getSqlValues(item, val))
 		}
 	})
 
