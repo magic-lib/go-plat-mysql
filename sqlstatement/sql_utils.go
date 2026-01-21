@@ -59,11 +59,11 @@ func StructToColumnsAndValues(in any, convertType string, tagNames ...string) (t
 
 func convertToByType(in string, convertType string) string {
 	if convertType == "snake" {
-		return utils.ChangeVariableName(in, "lower")
+		return utils.ChangeVariableName(in, utils.Snake)
 	}
 
 	if convertType == "camel" {
-		return utils.ChangeVariableName(in, "upper")
+		return utils.ChangeVariableName(in, utils.Camel)
 	}
 	if convertType == "lower" {
 		return strings.ToLower(in)
