@@ -191,6 +191,13 @@ func getDefaultTime(oneColumn *MysqlColumn) (string, bool) {
 	return "", false
 }
 
+// MysqlSchema 获取当前数据库名
+func MysqlSchema(db *sql.DB) (string, error) {
+	var schema string
+	err := db.QueryRow("SELECT SCHEMA()").Scan(&schema)
+	return schema, err
+}
+
 // MysqlColumnValidValue 获取mysql合法字符
 func MysqlColumnValidValue(v any, oneColumn *MysqlColumn) any {
 	if v == nil {
