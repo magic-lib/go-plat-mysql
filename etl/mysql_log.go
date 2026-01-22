@@ -8,6 +8,7 @@ import (
 	"github.com/magic-lib/go-plat-mysql/sqlcomm"
 	"github.com/magic-lib/go-plat-mysql/sqlstatement"
 	"github.com/magic-lib/go-plat-utils/conv"
+	"github.com/magic-lib/go-plat-utils/utils"
 	"github.com/samber/lo"
 	"time"
 )
@@ -101,7 +102,7 @@ func (m *mysqlLogger) InsertLogRecord(r *MysqlLogRecord) (int64, error) {
 		Status:     "start",
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
-	}, "snake")
+	}, utils.Snake)
 	if err != nil {
 		return 0, err
 	}

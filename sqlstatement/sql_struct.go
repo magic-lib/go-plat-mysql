@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/magic-lib/go-plat-utils/cond"
 	"github.com/magic-lib/go-plat-utils/conv"
+	"github.com/magic-lib/go-plat-utils/utils"
 	"github.com/samber/lo"
 	"strings"
 )
@@ -14,7 +15,7 @@ type SqlStruct struct {
 	structData                any           //通过这个可以直接获得mysql数据结构
 	tableName                 string        //表名
 	columnList                []*ColumnInfo //表字段信息
-	convertTableAndColumnType string
+	convertTableAndColumnType utils.VariableType
 	columnTagName             string
 }
 
@@ -23,7 +24,7 @@ type Option func(*SqlStruct)
 // NewSqlStruct 新建一个对象
 func NewSqlStruct(opts ...Option) *SqlStruct {
 	var s = &SqlStruct{
-		convertTableAndColumnType: "snake",
+		convertTableAndColumnType: utils.Snake,
 	}
 	for _, opt := range opts {
 		opt(s)

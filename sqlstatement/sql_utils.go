@@ -12,16 +12,16 @@ import (
 // StructToColumnsAndValues 将结构体转换为 SQL 对应的列名列表和值列表
 // convertType 默认的转换方式，如果没有获取到tag，则默认的转换方式。
 // 支持的类型有：snake 蛇形命名，camel 驼峰命名，lower 小写命名, upper 大写命名
-func StructToColumnsAndValues(in any, convertType string, tagNames ...string) (tableName string, columnsMap map[string]any, err error) {
+func StructToColumnsAndValues(in any, convertType utils.VariableType, tagNames ...string) (tableName string, columnsMap map[string]any, err error) {
 	structName, columnMap, err := utils.GetStructInfoByTag(in, func(s string) string {
-		return convertToByType(s, convertType)
+		return utils.VarNameConverter(s, convertType)
 	}, tagNames...)
 
 	if err != nil {
 		return "", nil, err
 	}
 
-	tableName = convertToByType(structName, convertType)
+	tableName = utils.VarNameConverter(structName, convertType)
 
 	columnsMap = make(map[string]any)
 	//需要过滤出nil的项目
@@ -55,23 +55,6 @@ func StructToColumnsAndValues(in any, convertType string, tagNames ...string) (t
 	}
 
 	return tableName, columnsMap, nil
-}
-
-func convertToByType(in string, convertType string) string {
-	if convertType == "snake" {
-		return utils.ChangeVariableName(in, utils.Snake)
-	}
-
-	if convertType == "camel" {
-		return utils.ChangeVariableName(in, utils.Camel)
-	}
-	if convertType == "lower" {
-		return strings.ToLower(in)
-	}
-	if convertType == "upper" {
-		return strings.ToUpper(in)
-	}
-	return in
 }
 func getSliceByMap(columnsMap map[string]any) ([]string, []any) {
 	columns := make([]string, 0)

@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/magic-lib/go-plat-mysql/sqlstatement"
 	"github.com/magic-lib/go-plat-utils/conv"
+	"github.com/magic-lib/go-plat-utils/utils"
 	"testing"
 	"time"
 )
@@ -119,7 +120,7 @@ func TestGenerateWhereClause1(t *testing.T) {
 }
 func TestGetTableName(t *testing.T) {
 	aa := AgeKey{}
-	a, b, e := sqlstatement.StructToColumnsAndValues(aa, "snake", "json")
+	a, b, e := sqlstatement.StructToColumnsAndValues(aa, utils.Snake, "json")
 	fmt.Println(a, b, e)
 }
 func TestInsertSql(t *testing.T) {
