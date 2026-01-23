@@ -203,9 +203,23 @@ func (s *Statement) GenerateWhereClause(group LogicCondition) (string, []any) {
 
 // isValidFieldName 是不是合法的字段名
 func isValidFieldName(name string) bool {
+	if name == "" || len(name) > 64 {
+		return false
+	}
 	pattern := `^[a-zA-Z_][a-zA-Z0-9_]*$`
 	match, _ := regexp.MatchString(pattern, name)
 	return match
+}
+
+func isValidMySQLTableName(name string) bool {
+	if name == "" || len(name) > 64 {
+		return false
+	}
+	pattern := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
+	if !pattern.MatchString(name) {
+		return false
+	}
+	return true
 }
 
 // generateWhereClause 生成 WHERE 语句
@@ -237,10 +251,10 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		isSetField := false
 		oneFieldList := strings.Split(fieldStr, ".")
 		if len(oneFieldList) == 2 {
-			oneField := s.buildOneFieldName(oneFieldList[0])
-			twoField := s.buildOneFieldName(oneFieldList[1])
+			oneField := s.buildOneFieldName(oneFieldList[0]) //表名
+			twoField := s.buildOneFieldName(oneFieldList[1]) //字段名
 			if oneField != "" && twoField != "" {
-				if isValidFieldName(oneField) && isValidFieldName(twoField) {
+				if isValidMySQLTableName(oneField) && isValidFieldName(twoField) {
 					fieldStr = fmt.Sprintf("`%s`.`%s`", oneField, twoField)
 					isSetField = true
 				}

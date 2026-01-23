@@ -7,6 +7,7 @@ import (
 	"github.com/magic-lib/go-plat-mysql/sqlstatement"
 	"github.com/magic-lib/go-plat-utils/conv"
 	"github.com/magic-lib/go-plat-utils/utils"
+	"regexp"
 	"testing"
 	"time"
 )
@@ -122,6 +123,23 @@ func TestGetTableName(t *testing.T) {
 	aa := AgeKey{}
 	a, b, e := sqlstatement.StructToColumnsAndValues(aa, utils.Snake, "json")
 	fmt.Println(a, b, e)
+}
+
+func isValidMySQLTableName(name string) bool {
+	if name == "" || len(name) > 64 {
+		return false
+	}
+	pattern := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
+	if !pattern.MatchString(name) {
+		return false
+	}
+	return true
+}
+func TestValidTableName(t *testing.T) {
+	aa := isValidMySQLTableName("aaaa-bb")
+	fmt.Println(aa)
+	aa = isValidMySQLTableName("aaaa_bb")
+	fmt.Println(aa)
 }
 func TestInsertSql(t *testing.T) {
 	sqlObj := sqlstatement.NewSqlStruct(sqlstatement.SetTableName("`kkkk`"))
