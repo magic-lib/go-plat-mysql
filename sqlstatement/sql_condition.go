@@ -227,14 +227,34 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 
 	// 如果Field不含空格表示是字段，则加上`
 	fieldStr := con.Field
-	if !isValidFieldName(fieldStr) {
+	if isValidFieldName(fieldStr) {
+		fieldStr = fmt.Sprintf("`%s`", fieldStr)
 		if con.Value == nil {
-			return fieldStr, []any{}, nil
+			//表示无值，则选项不处理
+			return "", []any{}, nil
 		}
 	} else {
-		fieldStr = fmt.Sprintf("`%s`", con.Field)
-		if con.Value == nil {
-			return "", []any{}, nil
+		isSetField := false
+		oneFieldList := strings.Split(fieldStr, ".")
+		if len(oneFieldList) == 2 {
+			oneField := s.buildOneFieldName(oneFieldList[0])
+			twoField := s.buildOneFieldName(oneFieldList[1])
+			if oneField != "" && twoField != "" {
+				if isValidFieldName(oneField) && isValidFieldName(twoField) {
+					fieldStr = fmt.Sprintf("`%s`.`%s`", oneField, twoField)
+					isSetField = true
+				}
+			}
+		}
+		if isSetField {
+			if con.Value == nil {
+				//表示无值，则选项不处理
+				return "", []any{}, nil
+			}
+		} else {
+			if con.Value == nil {
+				return fieldStr, []any{}, nil
+			}
 		}
 	}
 

@@ -17,12 +17,12 @@ func TestGenerateWhereClause(t *testing.T) {
 	sqlStr, list := sta.GenerateWhereClause(sqlstatement.LogicCondition{
 		Conditions: []any{
 			sqlstatement.Condition{
-				Field:    "name",
+				Field:    "b.name",
 				Value:    "test",
 				Operator: "=",
 			},
 			sqlstatement.Condition{
-				Field:    "age",
+				Field:    "a.age",
 				Value:    18,
 				Operator: "=",
 			},
