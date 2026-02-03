@@ -415,9 +415,7 @@ func (s *Statement) UpdateSql(tableName string, allColumns []string, updateMap m
 		}
 	}
 
-	for i, column := range columnList {
-		columnList[i] = addCodeForOneColumn(column)
-	}
+	columnList = addCodeForColumns(columnList)
 
 	tableName = addCodeForOneColumn(tableName)
 	columnList = lo.Map(columnList, func(item string, index int) string {

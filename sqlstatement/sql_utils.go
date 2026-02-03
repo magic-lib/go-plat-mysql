@@ -56,13 +56,45 @@ func StructToColumnsAndValues(in any, convertType utils.VariableType, tagNames .
 
 	return tableName, columnsMap, nil
 }
-func getSliceByMap(columnsMap map[string]any) ([]string, []any) {
+
+func StructToColumns(in any, convertType utils.VariableType, tagNames ...string) (tableName string, columns []string, err error) {
+	tableName, columnsMap, err := StructToColumnsAndValues(in, convertType, tagNames...)
+	if err != nil {
+		return "", nil, err
+	}
+	_, columnKeyList, _, err := utils.GetFieldListByTag(in, func(s string) string {
+		return utils.VarNameConverter(s, convertType)
+	}, tagNames...)
+	if err != nil {
+		return "", nil, err
+	}
+	columns, _ = getSliceByMap(columnKeyList, columnsMap)
+	return tableName, columns, nil
+}
+
+func getSliceByMap(columnList []string, columnsMap map[string]any) ([]string, []any) {
 	columns := make([]string, 0)
 	dataList := make([]any, 0)
-
-	for k, v := range columnsMap {
-		columns = append(columns, k)
-		dataList = append(dataList, getSqlValues(k, v))
+	if len(columnList) > 0 {
+		for _, key := range columnList {
+			if _, exists := columnsMap[key]; exists {
+				columns = append(columns, key)
+				dataList = append(dataList, getSqlValues(key, columnsMap[key]))
+			}
+		}
+	}
+	for key := range columnsMap {
+		var found bool
+		for _, v := range columns {
+			if v == key {
+				found = true
+				break
+			}
+		}
+		if !found {
+			columns = append(columns, key)
+			dataList = append(dataList, getSqlValues(key, columnsMap[key]))
+		}
 	}
 	return columns, dataList
 }

@@ -99,9 +99,9 @@ func (s *SqlStruct) buildMapForInsertOrUpdate(columnsMap map[string]any) map[str
 	return columnsMap
 }
 
-func (s *SqlStruct) commGetTableNameAndColumns(in any) (string, map[string]any, error) {
+func (s *SqlStruct) commGetTableNameAndColumns(in any) (string, []string, map[string]any, error) {
 	if in == nil {
-		return "", nil, fmt.Errorf("please use SetStructData func")
+		return "", nil, nil, fmt.Errorf("please use SetStructData func")
 	}
 
 	tagNames := make([]string, 0)
@@ -110,7 +110,7 @@ func (s *SqlStruct) commGetTableNameAndColumns(in any) (string, map[string]any, 
 	}
 	tableName, columnsMap, err := StructToColumnsAndValues(in, s.convertTableAndColumnType, tagNames...)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	if s.tableName != "" {
 		tableName = s.tableName
@@ -121,7 +121,12 @@ func (s *SqlStruct) commGetTableNameAndColumns(in any) (string, map[string]any, 
 		s.structData = in
 	}
 
-	return tableName, columnsMap, nil
+	_, columnsList, err := StructToColumns(in, s.convertTableAndColumnType, tagNames...)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	return tableName, columnsList, columnsMap, nil
 }
 
 // InsertSql 插入的sql语句
@@ -132,12 +137,12 @@ func (s *SqlStruct) InsertSql(in any) (string, []any, error) {
 			return s.insertSqlList(inList)
 		}
 	}
-	tableName, columnMap, err := s.commGetTableNameAndColumns(in)
+	tableName, columnList, columnMap, err := s.commGetTableNameAndColumns(in)
 	if err != nil {
 		return "", nil, err
 	}
 	columnMap = s.buildMapForInsertOrUpdate(columnMap)
-	columns, values := getSliceByMap(columnMap)
+	columns, values := getSliceByMap(columnList, columnMap)
 	columns = addCodeForColumns(columns)
 	return squirrel.Insert(tableName).Columns(columns...).Values(values...).ToSql()
 }
@@ -147,33 +152,56 @@ func (s *SqlStruct) insertSqlList(inList []any) (string, []any, error) {
 	if len(inList) == 0 {
 		return "", nil, fmt.Errorf("inList is empty")
 	}
-	tableName, columnMap, err := s.commGetTableNameAndColumns(inList[0])
+	tableName, columns, _, err := s.commGetTableNameAndColumns(inList[0])
 	if err != nil {
 		return "", nil, err
 	}
-	columns, _ := getSliceByMap(columnMap)
 	columns = addCodeForColumns(columns)
 
 	query := squirrel.Insert(tableName).Columns(columns...)
 	for _, in := range inList {
-		_, oneColumnMap, err := s.commGetTableNameAndColumns(in)
+		_, columnList, oneColumnMap, err := s.commGetTableNameAndColumns(in)
 		if err != nil {
 			return "", nil, err
 		}
 		oneColumnMap = s.buildMapForInsertOrUpdate(oneColumnMap)
-		_, values := getSliceByMap(oneColumnMap)
+		oneColumns, oneValues := getSliceByMap(columnList, oneColumnMap)
+		values, err := reOrderValues(oneColumns, oneValues, columns)
+		if err != nil {
+			return "", nil, err
+		}
 		query = query.Values(values...)
 	}
 	return query.ToSql()
 }
 
+func reOrderValues(keys []string, values []any, newOrderKeys []string) ([]any, error) {
+	if len(keys) != len(values) || len(newOrderKeys) != len(values) {
+		return nil, fmt.Errorf("keys and values length not equal")
+	}
+	keys = addCodeForColumns(keys)
+	keyValueMap := make(map[string]any)
+	for i := range keys {
+		keyValueMap[keys[i]] = values[i]
+	}
+
+	var result []any
+	for _, key := range newOrderKeys {
+		key = addCodeForOneColumn(key)
+		if value, exists := keyValueMap[key]; exists {
+			result = append(result, value)
+		}
+	}
+	return result, nil
+}
+
 // InsertSqlByMap 插入的sql语句
 func (s *SqlStruct) InsertSqlByMap(inMap map[string]any) (string, []any, error) {
-	tableName, columnMap, err := s.commGetTableNameAndColumns(s.structData)
+	tableName, columnList, columnMap, err := s.commGetTableNameAndColumns(s.structData)
 	if err != nil {
 		return "", nil, err
 	}
-	columns, _ := getSliceByMap(columnMap)
+	columns, _ := getSliceByMap(columnList, columnMap)
 	st := new(Statement)
 	sqlStr, values := st.InsertSql(tableName, columns, inMap)
 	return sqlStr, values, nil
@@ -181,7 +209,7 @@ func (s *SqlStruct) InsertSqlByMap(inMap map[string]any) (string, []any, error) 
 
 // DeleteSql 删除的sql语句
 func (s *SqlStruct) DeleteSql(whereCondition LogicCondition) (string, []any, error) {
-	tableName, _, err := s.commGetTableNameAndColumns(s.structData)
+	tableName, _, _, err := s.commGetTableNameAndColumns(s.structData)
 	if err != nil {
 		return "", nil, err
 	}
@@ -195,11 +223,11 @@ func (s *SqlStruct) DeleteSql(whereCondition LogicCondition) (string, []any, err
 
 // DeleteSqlByMap 删除的sql语句，map里的关系是And关系
 func (s *SqlStruct) DeleteSqlByMap(whereMap map[string]any) (string, []any, error) {
-	tableName, columnMap, err := s.commGetTableNameAndColumns(s.structData)
+	tableName, columnList, columnMap, err := s.commGetTableNameAndColumns(s.structData)
 	if err != nil {
 		return "", nil, err
 	}
-	columns, _ := getSliceByMap(columnMap)
+	columns, _ := getSliceByMap(columnList, columnMap)
 	st := new(Statement)
 	sqlStr, values := st.DeleteSql(tableName, columns, whereMap)
 	return sqlStr, values, nil
@@ -207,7 +235,7 @@ func (s *SqlStruct) DeleteSqlByMap(whereMap map[string]any) (string, []any, erro
 
 // UpdateSql 修改的sql语句
 func (s *SqlStruct) UpdateSql(in any, columns []string, whereCondition LogicCondition) (string, []any, error) {
-	tableName, allColumnMap, err := s.commGetTableNameAndColumns(in)
+	tableName, _, allColumnMap, err := s.commGetTableNameAndColumns(in)
 	if err != nil {
 		return "", nil, err
 	}
@@ -241,7 +269,7 @@ func (s *SqlStruct) UpdateSql(in any, columns []string, whereCondition LogicCond
 
 // UpdateSqlByMap 修改的sql语句
 func (s *SqlStruct) UpdateSqlByMap(in any, columns []string, whereMap map[string]any) (string, []any, error) {
-	tableName, allColumnMap, err := s.commGetTableNameAndColumns(in)
+	tableName, columnList, allColumnMap, err := s.commGetTableNameAndColumns(in)
 	if err != nil {
 		return "", nil, err
 	}
@@ -258,18 +286,18 @@ func (s *SqlStruct) UpdateSqlByMap(in any, columns []string, whereMap map[string
 	}
 
 	st := new(Statement)
-	allColumns, _ := getSliceByMap(allColumnMap)
+	allColumns, _ := getSliceByMap(columnList, allColumnMap)
 	sqlStr, values := st.UpdateSql(tableName, allColumns, updateMap, whereMap)
 	return sqlStr, values, nil
 }
 
 // UpdateSqlWithUpdateMap 更新的sql语句，map里的关系是And关系
 func (s *SqlStruct) UpdateSqlWithUpdateMap(updateMap map[string]any, whereMap map[string]any) (string, []any, error) {
-	tableName, columnMap, err := s.commGetTableNameAndColumns(s.structData)
+	tableName, columnList, columnMap, err := s.commGetTableNameAndColumns(s.structData)
 	if err != nil {
 		return "", nil, err
 	}
-	allColumns, _ := getSliceByMap(columnMap)
+	allColumns, _ := getSliceByMap(columnList, columnMap)
 	st := new(Statement)
 	sqlStr, values := st.UpdateSql(tableName, allColumns, updateMap, whereMap)
 	return sqlStr, values, nil
@@ -277,7 +305,7 @@ func (s *SqlStruct) UpdateSqlWithUpdateMap(updateMap map[string]any, whereMap ma
 
 // SelectSql 查询的sql语句
 func (s *SqlStruct) SelectSql(selectStr string, whereCondition LogicCondition, offset, limit int) (string, []any, error) {
-	tableName, _, err := s.commGetTableNameAndColumns(s.structData)
+	tableName, _, _, err := s.commGetTableNameAndColumns(s.structData)
 	if err != nil {
 		return "", nil, err
 	}
@@ -299,11 +327,11 @@ func (s *SqlStruct) SelectSql(selectStr string, whereCondition LogicCondition, o
 
 // SelectSqlByMap 查询的sql语句
 func (s *SqlStruct) SelectSqlByMap(selectStr string, whereMap map[string]any, offset, limit int) (string, []any, error) {
-	tableName, columnMap, err := s.commGetTableNameAndColumns(s.structData)
+	tableName, columnList, columnMap, err := s.commGetTableNameAndColumns(s.structData)
 	if err != nil {
 		return "", nil, err
 	}
-	columns, _ := getSliceByMap(columnMap)
+	columns, _ := getSliceByMap(columnList, columnMap)
 	st := new(Statement)
 	sqlStr, values := st.SelectSql(tableName, columns, selectStr, whereMap, offset, limit)
 	return sqlStr, values, nil
