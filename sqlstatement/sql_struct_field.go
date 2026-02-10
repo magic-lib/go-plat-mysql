@@ -2,8 +2,8 @@ package sqlstatement
 
 import (
 	"database/sql"
+	"fmt"
 	cmap "github.com/orcaman/concurrent-map/v2"
-	"strings"
 )
 
 var (
@@ -12,45 +12,73 @@ var (
 )
 
 type ColumnInfo struct {
-	ColumnName string
-	IsNullable string
-	DataType   string
-	ColumnKey  string
-	ColumnType string
-	Extra      string
+	TableSchema     string
+	TableName       string
+	ColumnName      string
+	OrdinalPosition int
+	ColumnDefault   sql.NullString
+	IsNullable      bool
+	DataType        string
+	ColumnType      string
+	ColumnKey       string
+	Extra           string
+	ColumnComment   string
 }
 
-func getTableColumns(db *sql.DB, tableName string) ([]*ColumnInfo, error) {
-	if columnListMap.Has(tableName) {
-		if columnList, ok := columnListMap.Get(tableName); ok {
-			return columnList, nil
+func getTableColumns(db *sql.DB, tableSchema, tableName string) (string, string, []*ColumnInfo, error) {
+	newTableSchema := removeCodeForOneColumn(tableSchema)
+	newTableName := removeCodeForOneColumn(tableName)
+
+	if newTableName == "" {
+		return "", "", nil, fmt.Errorf("tableName is empty")
+	}
+
+	cacheKey := newTableSchema + "." + newTableName
+	if columnListMap.Has(cacheKey) {
+		if columnList, ok := columnListMap.Get(cacheKey); ok {
+			return newTableSchema, newTableName, columnList, nil
 		}
 	}
 	var columns []*ColumnInfo
-	query := `SELECT TABLE_SCHEMA, COLUMN_NAME, IS_NULLABLE, DATA_TYPE, COLUMN_KEY, COLUMN_TYPE, EXTRA FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME =?`
-	newTableName := strings.ReplaceAll(tableName, "`", "")
-	newTableName = strings.TrimSpace(newTableName)
+	query := `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, COLUMN_DEFAULT, IS_NULLABLE, DATA_TYPE, COLUMN_TYPE, COLUMN_KEY, EXTRA, COLUMN_COMMENT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME =?`
 	rows, err := db.Query(query, newTableName)
 	if err != nil {
-		return nil, err
+		return newTableSchema, newTableName, nil, err
 	}
 	defer func() {
 		_ = rows.Close()
 	}()
-	dataBaseName := ""
+
 	for rows.Next() {
 		var col ColumnInfo
-		err = rows.Scan(&dataBaseName, &col.ColumnName, &col.IsNullable, &col.DataType, &col.ColumnKey, &col.ColumnType, &col.Extra)
+		var isNullable string
+		var columnComment sql.NullString
+		err = rows.Scan(&col.TableSchema, &col.TableName, &col.ColumnName, &col.OrdinalPosition, &col.ColumnDefault, &isNullable, &col.DataType, &col.ColumnType, &col.ColumnKey, &col.Extra, &columnComment)
+		if col.TableSchema != "" {
+			newTableSchema = col.TableSchema
+		}
+		if col.TableName != "" {
+			newTableName = col.TableName
+		}
+
 		if err != nil {
-			return nil, err
+			return newTableSchema, newTableName, nil, err
+		}
+		if isNullable == "YES" {
+			col.IsNullable = true
+		} else {
+			col.IsNullable = false
+		}
+		if columnComment.Valid {
+			col.ColumnComment = columnComment.String
 		}
 		columns = append(columns, &col)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return newTableSchema, newTableName, nil, err
 	}
+	cacheKey = newTableSchema + "." + newTableName
+	columnListMap.Set(cacheKey, columns)
 
-	columnListMap.Set(tableName, columns)
-
-	return columns, nil
+	return newTableSchema, newTableName, columns, nil
 }

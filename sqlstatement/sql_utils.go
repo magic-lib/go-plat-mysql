@@ -119,3 +119,7 @@ func addCodeForOneColumn(column string) string {
 	column = strings.ReplaceAll(column, "`", "")
 	return "`" + column + "`"
 }
+func removeCodeForOneColumn(column string) string {
+	newTableSchema := strings.ReplaceAll(column, "`", "")
+	return strings.TrimSpace(newTableSchema)
+}

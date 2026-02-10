@@ -251,8 +251,8 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		isSetField := false
 		oneFieldList := strings.Split(fieldStr, ".")
 		if len(oneFieldList) == 2 {
-			oneField := s.buildOneFieldName(oneFieldList[0]) //表名
-			twoField := s.buildOneFieldName(oneFieldList[1]) //字段名
+			oneField := removeCodeForOneColumn(oneFieldList[0]) //表名
+			twoField := removeCodeForOneColumn(oneFieldList[1]) //字段名
 			if oneField != "" && twoField != "" {
 				if isValidMySQLTableName(oneField) && isValidFieldName(twoField) {
 					fieldStr = fmt.Sprintf("`%s`.`%s`", oneField, twoField)
@@ -351,13 +351,10 @@ func (s *Statement) buildFieldList(value any, isUniq bool) ([]string, []any) {
 func (s *Statement) buildFieldNames(canUpdateFieldNames []string) []string {
 	canUpdateFieldNamesTemp := make([]string, 0)
 	lo.ForEach(canUpdateFieldNames, func(item string, index int) {
-		canUpdateFieldNamesTemp = append(canUpdateFieldNamesTemp, strings.ReplaceAll(item, "`", ""))
+		oneItem := removeCodeForOneColumn(item)
+		canUpdateFieldNamesTemp = append(canUpdateFieldNamesTemp, oneItem)
 	})
 	return canUpdateFieldNamesTemp
-}
-func (s *Statement) buildOneFieldName(oneField string) string {
-	oneField = strings.ReplaceAll(oneField, "`", "")
-	return oneField
 }
 
 // getColumnListAndDataList 获取数据库的字段列表与数据
@@ -457,7 +454,7 @@ func (s *Statement) SelectSql(tableName string, allColumns []string, selectStr s
 		lo.ForEach(selectList, func(item string, index int) {
 			item = strings.TrimSpace(item)
 			if lo.IndexOf(allColumns, item) >= 0 {
-				item = s.buildOneFieldName(item)
+				item = removeCodeForOneColumn(item)
 				newSelectList = append(newSelectList, item)
 			}
 		})

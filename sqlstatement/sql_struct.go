@@ -9,10 +9,12 @@ import (
 	"github.com/magic-lib/go-plat-utils/utils"
 	"github.com/samber/lo"
 	"strings"
+	"time"
 )
 
 type SqlStruct struct {
 	structData                any           //通过这个可以直接获得mysql数据结构
+	tableSchema               string        //库名
 	tableName                 string        //表名
 	columnList                []*ColumnInfo //表字段信息
 	convertTableAndColumnType utils.VariableType
@@ -63,16 +65,22 @@ func SetColumnList(db *sql.DB, tableName string) Option {
 			tableName = s.tableName
 		}
 
-		columns, err := getTableColumns(db, tableName)
+		newTableSchema, newTableName, columns, err := getTableColumns(db, s.tableSchema, tableName)
 		if err == nil && len(columns) > 0 {
 			s.columnList = columns
+			if newTableSchema != "" {
+				s.tableSchema = newTableSchema
+			}
+			if newTableName != "" {
+				s.tableName = newTableName
+			}
 		}
 	}
 }
 
-func (s *SqlStruct) getDataTypeByName(columnName string) string {
+func (s *SqlStruct) getColumnData(columnName string) *ColumnInfo {
 	if len(s.columnList) == 0 || columnName == "" {
-		return ""
+		return nil
 	}
 	columnData, ok := lo.Find(s.columnList, func(item *ColumnInfo) bool {
 		if item.ColumnName == columnName {
@@ -81,22 +89,64 @@ func (s *SqlStruct) getDataTypeByName(columnName string) string {
 		return false
 	})
 	if ok && columnData != nil {
-		return strings.ToLower(columnData.DataType)
+		return columnData
 	}
-	return ""
+	return nil
 }
 
 // buildMapForInsertOrUpdate 处理insert和update 默认处理json类型的问题
 func (s *SqlStruct) buildMapForInsertOrUpdate(columnsMap map[string]any) map[string]any {
 	for k, v := range columnsMap {
-		dataType := s.getDataTypeByName(k)
+		columnData := s.getColumnData(k)
+		if columnData == nil {
+			continue
+		}
+		dataType := strings.ToLower(columnData.DataType)
 		if dataType == "json" {
 			if conv.String(v) == "" {
-				columnsMap[k] = "{}"
+				columnsMap[k] = s.getDefaultValutForJson(columnData)
 			}
+			continue
+		}
+		if dataType == "datetime" {
+			columnsMap[k] = s.getDefaultValutForDateTime(v, columnData)
+			continue
 		}
 	}
 	return columnsMap
+}
+
+func (s *SqlStruct) getDefaultValutForJson(columnData *ColumnInfo) string {
+	return "{}"
+}
+func (s *SqlStruct) getDefaultValutForDateTime(v any, columnData *ColumnInfo) any {
+	shouldUseCurrentTime := false
+	if columnData.ColumnDefault.Valid && columnData.ColumnDefault.String == "CURRENT_TIMESTAMP" {
+		shouldUseCurrentTime = true
+	}
+	useNow := false
+	vStr := conv.String(v)
+	if columnData.IsNullable {
+		if !cond.IsTime(vStr) {
+			if shouldUseCurrentTime {
+				useNow = true
+			}
+		}
+	} else {
+		if !cond.IsTime(vStr) {
+			useNow = true
+		} else {
+			oneTime, ok := conv.Time(vStr)
+			if !ok || cond.IsTimeEmpty(oneTime) {
+				useNow = true
+			}
+		}
+	}
+
+	if useNow {
+		return time.Now() //当前时间
+	}
+	return v
 }
 
 func (s *SqlStruct) commGetTableNameAndColumns(in any) (string, []string, map[string]any, error) {
