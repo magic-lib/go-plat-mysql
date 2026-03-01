@@ -73,6 +73,16 @@ var (
 	defaultLogicOperator = OperatorAnd
 )
 
+const (
+	sqlUpdateNoWhere   = "UPDATE %s SET %s"
+	sqlUpdateWithWhere = "UPDATE %s SET %s WHERE %s"
+	sqlWhereStr        = "%s WHERE %s"
+	sqlInsert          = "INSERT INTO %s SET %s"
+	sqlLimitStr        = "%s LIMIT %d, %d"
+	sqlDeleteStr       = "DELETE FROM %s"
+	sqlSelectStr       = "SELECT %s FROM %s"
+)
+
 type Statement struct {
 }
 
@@ -193,6 +203,8 @@ func (s *Statement) GenerateWhereClause(group LogicCondition) (string, []any) {
 				dataList = append(dataList, tempDataList...)
 			}
 			continue
+		default:
+			log.Println("GenerateWhereClause: unknown type:", c)
 		}
 	}
 	if len(parts) == 0 {
@@ -391,7 +403,7 @@ func (s *Statement) InsertSql(tableName string, allColumns []string, insertMap m
 	columnList = lo.Map(columnList, func(item string, index int) string {
 		return addCodeForOneColumn(item)
 	})
-	query := fmt.Sprintf("INSERT INTO %s SET %s", tableName, strings.Join(columnList, "=?,")+"=?")
+	query := fmt.Sprintf(sqlInsert, tableName, strings.Join(columnList, "=?,")+"=?")
 	return query, columnDataList
 }
 
@@ -422,11 +434,11 @@ func (s *Statement) UpdateSql(tableName string, allColumns []string, updateMap m
 	whereString, whereDataList := s.GenerateWhereClauseByMap(whereNewMap)
 	if len(whereString) == 0 {
 		//没有where语句
-		query := fmt.Sprintf("UPDATE %s SET %s", tableName, strings.Join(columnList, "=?,")+"=?")
+		query := fmt.Sprintf(sqlUpdateNoWhere, tableName, strings.Join(columnList, "=?,")+"=?")
 		return query, columnDataList
 	}
 	columnDataList = append(columnDataList, whereDataList...)
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", tableName, strings.Join(columnList, "=?,")+"=?", whereString)
+	query := fmt.Sprintf(sqlUpdateWithWhere, tableName, strings.Join(columnList, "=?,")+"=?", whereString)
 	return query, columnDataList
 }
 
@@ -437,7 +449,7 @@ func (s *Statement) UpdateSqlByWhereCondition(tableName string, allColumns []str
 	if whereStr == "" {
 		return query, updateColumnDataList
 	}
-	query = fmt.Sprintf("%s WHERE %s", query, whereStr)
+	query = fmt.Sprintf(sqlWhereStr, query, whereStr)
 	updateColumnDataList = append(updateColumnDataList, whereDataList...)
 	return query, updateColumnDataList
 }
@@ -476,12 +488,12 @@ func (s *Statement) SelectSql(tableName string, allColumns []string, selectStr s
 	tableName = addCodeForOneColumn(tableName)
 
 	whereString, whereDataList := s.GenerateWhereClauseByMap(whereNewMap)
-	query := fmt.Sprintf("SELECT %s FROM %s", selectStr, tableName)
+	query := fmt.Sprintf(sqlSelectStr, selectStr, tableName)
 	if whereString != "" {
-		query = fmt.Sprintf("%s WHERE %s", query, whereString)
+		query = fmt.Sprintf(sqlWhereStr, query, whereString)
 	}
 	if offset >= 0 && limit > 0 {
-		query = fmt.Sprintf("%s LIMIT %d, %d", query, offset, limit)
+		query = fmt.Sprintf(sqlLimitStr, query, offset, limit)
 	}
 
 	return query, whereDataList
@@ -494,9 +506,9 @@ func (s *Statement) SelectSqlByWhereCondition(tableName string, allColumns []str
 	if whereStr == "" {
 		return query, selectDataList
 	}
-	query = fmt.Sprintf("%s WHERE %s", query, whereStr)
+	query = fmt.Sprintf(sqlWhereStr, query, whereStr)
 	if offset >= 0 && num > 0 {
-		query = fmt.Sprintf("%s LIMIT %d, %d", query, offset, num)
+		query = fmt.Sprintf(sqlLimitStr, query, offset, num)
 	}
 	selectDataList = append(selectDataList, whereDataList...)
 	return query, selectDataList
@@ -515,9 +527,9 @@ func (s *Statement) DeleteSql(tableName string, allColumns []string, whereMap ma
 	}
 	whereString, whereDataList := s.GenerateWhereClauseByMap(whereNewMap)
 	tableName = addCodeForOneColumn(tableName)
-	query := fmt.Sprintf("DELETE FROM %s", tableName)
+	query := fmt.Sprintf(sqlDeleteStr, tableName)
 	if whereString != "" {
-		query = fmt.Sprintf("%s WHERE %s", query, whereString)
+		query = fmt.Sprintf(sqlWhereStr, query, whereString)
 	}
 	return query, whereDataList
 }
@@ -529,7 +541,7 @@ func (s *Statement) DeleteSqlByWhereCondition(tableName string, allColumns []str
 	if whereStr == "" {
 		return query, deleteDataList
 	}
-	query = fmt.Sprintf("%s WHERE %s", query, whereStr)
+	query = fmt.Sprintf(sqlWhereStr, query, whereStr)
 	deleteDataList = append(deleteDataList, whereDataList...)
 	return query, deleteDataList
 }
