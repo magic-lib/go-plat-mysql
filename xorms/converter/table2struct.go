@@ -10,7 +10,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-//map for converting mysql type to golang types
+// map for converting mysql type to golang types
 var typeForMysqlToGo = map[string]string{
 	"int":                "int",
 	"integer":            "int",
@@ -209,9 +209,9 @@ func (t *Table2Struct) Run() (string, error) {
 			return "", err
 		}
 		//defer f.Close()
-		f.WriteString(allContent)
+		_, _ = f.WriteString(allContent)
 		cmd := exec.Command("gofmt", "-w", filePath)
-		cmd.Run()
+		_ = cmd.Run()
 		return "", nil
 	}
 	return "", nil

@@ -13,6 +13,11 @@ import (
 	"strings"
 )
 
+// ICondition 定义条件接口
+type ICondition interface {
+	isCondition()
+}
+
 // Condition 表示单个查询条件
 type Condition struct {
 	Field    string
@@ -20,11 +25,15 @@ type Condition struct {
 	Value    any
 }
 
+func (c Condition) isCondition() {}
+
 // LogicCondition 表示逻辑分组
 type LogicCondition struct {
-	Conditions []any        // 可以是 Condition 或 LogicCondition
+	Conditions []ICondition // 可以是 Condition 或 LogicCondition
 	Operator   OperatorType // "AND" 或 "OR"
 }
+
+func (lc LogicCondition) isCondition() {}
 
 type OperatorType string
 
@@ -133,7 +142,7 @@ func (s *Statement) GetSqlColumnForLike(oldValue string) (retValLike string, ret
 // GenerateWhereClauseByMap 通过Map获取where语句
 func (s *Statement) GenerateWhereClauseByMap(whereMap map[string]any) (string, []any) {
 	oneLogicCondition := LogicCondition{
-		Conditions: make([]any, 0),
+		Conditions: make([]ICondition, 0),
 		Operator:   defaultLogicOperator,
 	}
 	for key, val := range whereMap {

@@ -87,7 +87,7 @@ func (b *batchMySqlTableImport) runWithColumnMap(oneData map[string]any) map[str
 		if v == "" {
 			continue
 		}
-		newVal, err := ruleEngine.RunOneRuleString(v, oneData)
+		newVal, err := ruleEngine.RunString(v, oneData)
 		if err == nil {
 			oneData[k] = newVal
 		}

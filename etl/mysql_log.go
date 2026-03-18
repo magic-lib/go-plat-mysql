@@ -187,7 +187,7 @@ func (m *mysqlLogger) getCurrentMaxPageWhere(r *MysqlLogRecord, pageStart, pageE
 		return sqlstatement.LogicCondition{}, fmt.Errorf("tableName or method is empty")
 	}
 
-	whereCond := sqlstatement.LogicCondition{Conditions: []any{
+	whereCond := sqlstatement.LogicCondition{Conditions: []sqlstatement.ICondition{
 		sqlstatement.Condition{
 			Field:    "database_name",
 			Operator: "=",

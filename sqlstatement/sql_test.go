@@ -16,7 +16,7 @@ func TestGenerateWhereClause(t *testing.T) {
 	sta := new(sqlstatement.Statement)
 
 	sqlStr, list := sta.GenerateWhereClause(sqlstatement.LogicCondition{
-		Conditions: []any{
+		Conditions: []sqlstatement.ICondition{
 			sqlstatement.Condition{
 				Field:    "b.name",
 				Value:    "test",
@@ -28,7 +28,7 @@ func TestGenerateWhereClause(t *testing.T) {
 				Operator: "=",
 			},
 			sqlstatement.LogicCondition{
-				Conditions: []any{
+				Conditions: []sqlstatement.ICondition{
 					sqlstatement.Condition{
 						Field:    "name",
 						Value:    "test",
@@ -49,9 +49,9 @@ func TestGenerateWhereClause(t *testing.T) {
 	fmt.Println(sqlStr, list)
 
 	sqlStr, list = sta.GenerateWhereClause(sqlstatement.LogicCondition{
-		Conditions: []any{
+		Conditions: []sqlstatement.ICondition{
 			sqlstatement.LogicCondition{
-				Conditions: []any{
+				Conditions: []sqlstatement.ICondition{
 					sqlstatement.Condition{
 						Field:    "name",
 						Value:    "test",
@@ -66,7 +66,7 @@ func TestGenerateWhereClause(t *testing.T) {
 				Operator: "and",
 			},
 			sqlstatement.LogicCondition{
-				Conditions: []any{
+				Conditions: []sqlstatement.ICondition{
 					sqlstatement.Condition{
 						Field:    "name",
 						Value:    "test",
@@ -87,7 +87,7 @@ func TestGenerateWhereClause(t *testing.T) {
 	fmt.Println(sqlStr, list)
 
 	sqlStr, list = sta.GenerateWhereClause(sqlstatement.LogicCondition{
-		Conditions: []any{
+		Conditions: []sqlstatement.ICondition{
 			sqlstatement.Condition{
 				Field:    "name",
 				Value:    "test",
@@ -152,7 +152,7 @@ func TestInsertSql(t *testing.T) {
 	fmt.Println(a, b, e)
 
 	a, b, e = sqlObj.DeleteSql(sqlstatement.LogicCondition{
-		Conditions: []any{
+		Conditions: []sqlstatement.ICondition{
 			sqlstatement.Condition{
 				Field:    "1",
 				Operator: "=",
@@ -165,7 +165,7 @@ func TestInsertSql(t *testing.T) {
 		Age:  12,
 		Name: &mm,
 	}, []string{"name"}, sqlstatement.LogicCondition{
-		Conditions: []any{
+		Conditions: []sqlstatement.ICondition{
 			sqlstatement.Condition{
 				Field:    "1",
 				Operator: "=",
@@ -175,7 +175,7 @@ func TestInsertSql(t *testing.T) {
 	})
 	fmt.Println(a, b, e)
 	a, b, e = sqlObj.SelectSql("", sqlstatement.LogicCondition{
-		Conditions: []any{
+		Conditions: []sqlstatement.ICondition{
 			sqlstatement.Condition{
 				Field:    "1",
 				Operator: "=",
