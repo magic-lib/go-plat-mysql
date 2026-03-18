@@ -204,7 +204,7 @@ func (s *Statement) GenerateWhereClause(group LogicCondition) (string, []any) {
 			}
 			continue
 		default:
-			log.Println("GenerateWhereClause: unknown type:", c)
+			log.Println("GenerateWhereClause: unknown type:", c, conv.String(group))
 		}
 	}
 	if len(parts) == 0 {
