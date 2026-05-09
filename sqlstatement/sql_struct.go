@@ -103,7 +103,8 @@ func (s *SqlStruct) buildMapForInsertOrUpdate(columnsMap map[string]any) map[str
 		}
 		dataType := strings.ToLower(columnData.DataType)
 		if dataType == "json" {
-			if conv.String(v) == "" {
+			vStr := conv.String(v)
+			if !cond.IsJson(vStr) { // 如果不是json格式，则用默认值，避免错误
 				columnsMap[k] = s.getDefaultValutForJson(columnData)
 			}
 			continue

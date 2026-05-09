@@ -10,6 +10,7 @@ import (
 	"github.com/magic-lib/go-plat-utils/templates/ruleengine"
 	"github.com/magic-lib/go-plat-utils/utils/httputil"
 	"github.com/samber/lo"
+	"log"
 )
 
 type batchMySqlTableImport struct {
@@ -90,6 +91,9 @@ func (b *batchMySqlTableImport) runWithColumnMap(oneData map[string]any) map[str
 		newVal, err := ruleEngine.RunString(v, oneData)
 		if err == nil {
 			oneData[k] = newVal
+		} else {
+			log.Print("runWithColumnMap:", err)
+			oneData[k] = v
 		}
 	}
 	return oneData
