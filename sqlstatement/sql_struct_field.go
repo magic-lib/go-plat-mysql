@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	cmap "github.com/orcaman/concurrent-map/v2"
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
 var (
@@ -40,7 +41,7 @@ func getTableColumns(db *sql.DB, tableSchema, tableName string) (string, string,
 		}
 	}
 	var columns []*ColumnInfo
-	query := `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, COLUMN_DEFAULT, IS_NULLABLE, DATA_TYPE, COLUMN_TYPE, COLUMN_KEY, EXTRA, COLUMN_COMMENT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME =?`
+	query := `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, COLUMN_DEFAULT, IS_NULLABLE, DATA_TYPE, COLUMN_TYPE, COLUMN_KEY, EXTRA, COLUMN_COMMENT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME =? ORDER BY ORDINAL_POSITION`
 	rows, err := db.Query(query, newTableName)
 	if err != nil {
 		return newTableSchema, newTableName, nil, err
@@ -81,4 +82,84 @@ func getTableColumns(db *sql.DB, tableSchema, tableName string) (string, string,
 	columnListMap.Set(cacheKey, columns)
 
 	return newTableSchema, newTableName, columns, nil
+}
+
+type tableColumn struct {
+	TableSchema     string         `db:"TABLE_SCHEMA"`     // 字段名
+	TableName       string         `db:"TABLE_NAME"`       // 字段名
+	ColumnName      string         `db:"COLUMN_NAME"`      // 字段名
+	OrdinalPosition string         `db:"ORDINAL_POSITION"` // 字段名
+	ColumnDefault   sql.NullString `db:"COLUMN_DEFAULT"`   // 默认值
+	IsNullable      string         `db:"IS_NULLABLE"`      // 是否可为空
+	DataType        string         `db:"DATA_TYPE"`        // 字段类型
+	ColumnType      string         `db:"COLUMN_TYPE"`      // 字段名
+	ColumnKey       string         `db:"COLUMN_KEY"`       // 字段名
+	Extra           string         `db:"EXTRA"`            // 字段名
+	ColumnComment   string         `db:"COLUMN_COMMENT"`   // 注释
+}
+
+func getTableColumnsBySqlConn(db sqlx.SqlConn, tableSchema, tableName string) (string, string, []*ColumnInfo, error) {
+	newTableSchema := removeCodeForOneColumn(tableSchema)
+	newTableName := removeCodeForOneColumn(tableName)
+
+	if newTableName == "" {
+		return "", "", nil, fmt.Errorf("tableName is empty")
+	}
+
+	cacheKey := newTableSchema + "." + newTableName
+	if columnListMap.Has(cacheKey) {
+		if columnList, ok := columnListMap.Get(cacheKey); ok {
+			return newTableSchema, newTableName, columnList, nil
+		}
+	}
+	var columns []tableColumn
+	query := `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, COLUMN_DEFAULT, IS_NULLABLE, DATA_TYPE, COLUMN_TYPE, COLUMN_KEY, EXTRA, COLUMN_COMMENT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME =? ORDER BY ORDINAL_POSITION`
+	err := db.QueryRows(&columns, query, newTableName)
+	if err != nil {
+		return newTableSchema, newTableName, nil, err
+	}
+	if len(columns) == 0 {
+		return newTableSchema, newTableName, nil, fmt.Errorf("no columns found for table %s", newTableName)
+	}
+	var columnInfos []*ColumnInfo
+	newTableSchema, newTableName, columnInfos = convertTableColumnsToColumnInfos(columns)
+
+	cacheKey = newTableSchema + "." + newTableName
+	columnListMap.Set(cacheKey, columnInfos)
+
+	return newTableSchema, newTableName, columnInfos, nil
+}
+
+func convertTableColumnsToColumnInfos(columns []tableColumn) (string, string, []*ColumnInfo) {
+	var newTableSchema, newTableName string
+
+	columnInfos := make([]*ColumnInfo, 0, len(columns))
+	for _, col := range columns {
+		newTableSchema = col.TableSchema
+		newTableName = col.TableName
+
+		ordinalPosition := 0
+		fmt.Sscanf(col.OrdinalPosition, "%d", &ordinalPosition)
+
+		isNullable := false
+		if col.IsNullable == "YES" {
+			isNullable = true
+		}
+
+		columnInfo := &ColumnInfo{
+			TableSchema:     col.TableSchema,
+			TableName:       col.TableName,
+			ColumnName:      col.ColumnName,
+			OrdinalPosition: ordinalPosition,
+			ColumnDefault:   col.ColumnDefault,
+			IsNullable:      isNullable,
+			DataType:        col.DataType,
+			ColumnType:      col.ColumnType,
+			ColumnKey:       col.ColumnKey,
+			Extra:           col.Extra,
+			ColumnComment:   col.ColumnComment,
+		}
+		columnInfos = append(columnInfos, columnInfo)
+	}
+	return newTableSchema, newTableName, columnInfos
 }

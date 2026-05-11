@@ -38,20 +38,22 @@ func StructToColumnsAndValues(in any, convertType utils.VariableType, tagNames .
 		}
 		if ti.Kind() == reflect.Struct {
 			if nullVal, ok := value.(sql.NullTime); ok {
-				if nullVal.Valid {
-					columnsMap[key] = conv.String(nullVal.Time)
-				}
+				columnsMap[key] = conv.String(nullVal.Time)
 				continue
 			}
 			if nullVal, ok := value.(sql.NullString); ok {
 				if nullVal.Valid {
 					columnsMap[key] = nullVal.String
+				} else {
+					columnsMap[key] = ""
 				}
 				continue
 			}
 			if nullVal, ok := value.(sql.NullBool); ok {
 				if nullVal.Valid {
 					columnsMap[key] = nullVal.Bool
+				} else {
+					columnsMap[key] = false
 				}
 				continue
 			}

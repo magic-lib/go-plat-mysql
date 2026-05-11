@@ -8,6 +8,7 @@ import (
 	"github.com/magic-lib/go-plat-utils/conv"
 	"github.com/magic-lib/go-plat-utils/utils"
 	"github.com/samber/lo"
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
 	"strings"
 	"time"
 )
@@ -66,6 +67,26 @@ func SetColumnList(db *sql.DB, tableName string) Option {
 		}
 
 		newTableSchema, newTableName, columns, err := getTableColumns(db, s.tableSchema, tableName)
+		if err == nil && len(columns) > 0 {
+			s.columnList = columns
+			if newTableSchema != "" {
+				s.tableSchema = newTableSchema
+			}
+			if newTableName != "" {
+				s.tableName = newTableName
+			}
+		}
+	}
+}
+
+// SetColumnListBySqlConn 设置获取字段的类型
+func SetColumnListBySqlConn(db sqlx.SqlConn, tableName string) Option {
+	return func(s *SqlStruct) {
+		if s.tableName != "" {
+			tableName = s.tableName
+		}
+
+		newTableSchema, newTableName, columns, err := getTableColumnsBySqlConn(db, s.tableSchema, tableName)
 		if err == nil && len(columns) > 0 {
 			s.columnList = columns
 			if newTableSchema != "" {
