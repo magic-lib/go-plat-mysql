@@ -35,10 +35,20 @@ func NewSqlStruct(opts ...Option) *SqlStruct {
 	return s
 }
 
+// GetTableName 获取库名和表名
+func (ss *SqlStruct) GetDatabaNameAndTableName() (string, string) {
+	return ss.tableSchema, ss.tableName
+}
+
 // SetTableName 设置表名
 func SetTableName(tableName string) Option {
 	return func(s *SqlStruct) {
 		s.tableName = tableName
+	}
+}
+func SetDatabaseName(databaseName string) Option {
+	return func(s *SqlStruct) {
+		s.tableSchema = databaseName
 	}
 }
 
