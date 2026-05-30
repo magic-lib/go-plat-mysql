@@ -111,7 +111,7 @@ func (m *allEngine) monitorEngine() {
 		for key, value := range engList.Items() {
 			err := value.Close()
 			if err != nil {
-				logs.DefaultLogger().Error("runCheckEngine SetFinalizer close error:", err)
+				logs.DefaultLogger().Error("runCheckEngine SetFinalizer close error:", err.Error())
 			}
 			engList.Remove(key)
 		}

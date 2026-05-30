@@ -257,3 +257,124 @@ func TestInsertIgnore(t *testing.T) {
 	fmt.Println(query)
 	fmt.Println(columnDataList, err)
 }
+
+func TestCondition(t *testing.T) {
+	//workbenchType := []string{"aa", "bb"}
+
+	//commCondition := sqlstatement.LogicCondition{
+	//	Conditions: []sqlstatement.ICondition{
+	//		sqlstatement.LogicCondition{
+	//			Conditions: []sqlstatement.ICondition{
+	//				sqlstatement.Condition{
+	//					Field:    "order_type",
+	//					Operator: "!=",
+	//					Value:    2,
+	//				},
+	//				sqlstatement.Condition{
+	//					Field:    "LOWER(review_type)",
+	//					Operator: "in",
+	//					Value:    workbenchType,
+	//				},
+	//			},
+	//			Operator: "AND",
+	//		},
+	//		sqlstatement.LogicCondition{
+	//			Conditions: []sqlstatement.ICondition{
+	//				sqlstatement.Condition{
+	//					Field:    "order_type",
+	//					Operator: "=",
+	//					Value:    2,
+	//				},
+	//				sqlstatement.Condition{
+	//					Field:    "review_type",
+	//					Operator: "=",
+	//					Value:    "buy-off",
+	//				},
+	//			},
+	//			Operator: "AND",
+	//		},
+	//	},
+	//	Operator: "OR",
+	//}
+	//
+	//unassignedWhereStr := sqlstatement.LogicCondition{
+	//	Conditions: []sqlstatement.ICondition{
+	//		sqlstatement.Condition{
+	//			Field:    "review_status",
+	//			Operator: "=",
+	//			Value:    5,
+	//		},
+	//		commCondition,
+	//	},
+	//	Operator: "AND",
+	//}
+	//pendingWhereStr := sqlstatement.LogicCondition{
+	//	Conditions: []sqlstatement.ICondition{
+	//		sqlstatement.Condition{
+	//			Field:    "review_status",
+	//			Operator: "=",
+	//			Value:    7,
+	//		},
+	//		commCondition,
+	//	},
+	//	Operator: "AND",
+	//}
+	//suspendWhereStr := sqlstatement.LogicCondition{
+	//	Conditions: []sqlstatement.ICondition{
+	//		sqlstatement.Condition{
+	//			Field:    "review_status",
+	//			Operator: "=",
+	//			Value:    2,
+	//		},
+	//		commCondition,
+	//	},
+	//	Operator: "AND",
+	//}
+	//resolvedWhereStr := sqlstatement.LogicCondition{
+	//	Conditions: []sqlstatement.ICondition{
+	//		sqlstatement.Condition{
+	//			Field:    "review_status",
+	//			Operator: "in",
+	//			Value:    []int{3, 4},
+	//		},
+	//		commCondition,
+	//		sqlstatement.LogicCondition{
+	//			Conditions: []sqlstatement.ICondition{
+	//				sqlstatement.Condition{
+	//					Field:    "end_time",
+	//					Operator: "is not",
+	//					Value:    "null",
+	//				},
+	//			},
+	//			Operator: "AND",
+	//		},
+	//	},
+	//	Operator: "AND",
+	//}
+	noOperatorWhereStr := sqlstatement.LogicCondition{
+		Conditions: []sqlstatement.ICondition{
+			sqlstatement.Condition{
+				Field: "name=? and pp= ?",
+				Value: []any{"5555", 66},
+			},
+			sqlstatement.Condition{
+				Field: "age=?",
+				Value: 44,
+			},
+		},
+		Operator: "AND",
+	}
+
+	st := new(sqlstatement.Statement)
+	//s1, d1 := st.GenerateWhereClause(unassignedWhereStr)
+	//s2, d2 := st.GenerateWhereClause(pendingWhereStr)
+	//s3, d3 := st.GenerateWhereClause(suspendWhereStr)
+	//s4, d4 := st.GenerateWhereClause(resolvedWhereStr)
+	s5, d5 := st.GenerateWhereClause(noOperatorWhereStr)
+
+	//fmt.Println(s1, d1)
+	//fmt.Println(s2, d2)
+	//fmt.Println(s3, d3)
+	//fmt.Println(s4, d4)
+	fmt.Println(s5, d5)
+}

@@ -259,6 +259,29 @@ func (s *Statement) generateWhereFromCondition(con Condition) (string, []any, er
 		}
 		return "", []any{}, nil
 	}
+	if con.Operator == "" {
+		if con.Field != "" && con.Value != nil {
+			// 统计 Field 中 ? 的数量
+			questionMarkCount := strings.Count(con.Field, "?")
+
+			// 检查 Value 是否为数组或切片类型
+			vKind := reflect.TypeOf(con.Value).Kind()
+			if vKind == reflect.Slice || vKind == reflect.Array {
+				vValue := reflect.ValueOf(con.Value)
+				valueCount := vValue.Len()
+				// 如果 ? 的数量与 Value 的元素数量一致，则直接返回
+				if questionMarkCount == valueCount {
+					valueList := make([]any, 0)
+					for i := 0; i < valueCount; i++ {
+						valueList = append(valueList, vValue.Index(i).Interface())
+					}
+					return con.Field, valueList, nil
+				}
+			} else if questionMarkCount == 1 {
+				return con.Field, []any{con.Value}, nil
+			}
+		}
+	}
 
 	// 如果Field不含空格表示是字段，则加上`
 	fieldStr := con.Field

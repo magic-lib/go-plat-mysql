@@ -246,7 +246,7 @@ func (m *Dao) explainSqlHandle(sqlOrArgs ...any) {
 	sqlOrArgs[0] = fmt.Sprintf("%s %s", "EXPLAIN", sqlOrArgs[0])
 	retList, err := m.engine.Query(sqlOrArgs...)
 	if err != nil {
-		logs.DefaultLogger().Error(sqlOrArgs[0], err)
+		logs.DefaultLogger().Error(sqlOrArgs[0], err.Error())
 		return
 	}
 	if len(retList) == 0 {
@@ -319,7 +319,7 @@ func (m *Dao) SqlQuery(sqlStr string, args ...any) ([]map[string]string, error) 
 	}
 	retList, err := m.engine.Query(queryParam...)
 	if err != nil {
-		logs.DefaultLogger().Error("SqlQuery Error:", err, sqlStr, m.engine)
+		logs.DefaultLogger().Error("SqlQuery Error:", err.Error(), sqlStr, m.engine)
 		return nil, err
 	}
 	if explainSql {
