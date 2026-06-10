@@ -387,9 +387,17 @@ func (s *SqlStruct) UpdateSqlWithUpdateMap(updateMap map[string]any, whereMap ma
 
 // SelectSql 查询的sql语句
 func (s *SqlStruct) SelectSql(selectStr string, whereCondition LogicCondition, offset, limit int) (string, []any, error) {
-	tableName, _, _, err := s.commGetTableNameAndColumns(s.structData)
+	selectBuilder, err := s.SelectBuilderForSelect(selectStr, whereCondition, offset, limit)
 	if err != nil {
 		return "", nil, err
+	}
+	return selectBuilder.ToSql()
+}
+// SelectBuilderForSelect 查询的sql语句，可以增加orderBy等其它语句
+func (s *SqlStruct) SelectBuilderForSelect(selectStr string, whereCondition LogicCondition, offset, limit int) (squirrel.SelectBuilder, error) {
+	tableName, _, _, err := s.commGetTableNameAndColumns(s.structData)
+	if err != nil {
+		return squirrel.SelectBuilder{}, err
 	}
 
 	if selectStr == "" {
@@ -404,7 +412,7 @@ func (s *SqlStruct) SelectSql(selectStr string, whereCondition LogicCondition, o
 	if offset >= 0 && limit > 0 {
 		sqlState = sqlState.Offset(uint64(offset)).Limit(uint64(limit))
 	}
-	return sqlState.ToSql()
+	return sqlState, nil
 }
 
 // SelectSqlByMap 查询的sql语句

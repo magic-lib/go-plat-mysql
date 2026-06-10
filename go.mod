@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/magic-lib/go-plat-startupcfg v1.20260210.2-0.20260310082347-edba5f046593
-	github.com/magic-lib/go-plat-utils v1.20260210.2-0.20260530064649-e508f5bc568d
+	github.com/magic-lib/go-plat-utils v1.20260210.2-0.20260610082355-a4b49b6699d6
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/samber/lo v1.52.0
 	github.com/urfave/cli/v2 v2.27.7

@@ -190,40 +190,40 @@ func (m *mysqlLogger) getCurrentMaxPageWhere(r *MysqlLogRecord, pageStart, pageE
 	whereCond := sqlstatement.LogicCondition{Conditions: []sqlstatement.ICondition{
 		sqlstatement.Condition{
 			Field:    "database_name",
-			Operator: "=",
+			Operator: sqlstatement.OperatorEqual,
 			Value:    squirrel.Expr("DATABASE()"),
 		},
 		sqlstatement.Condition{
 			Field:    "table_name",
-			Operator: "=",
+			Operator: sqlstatement.OperatorEqual,
 			Value:    r.TableName,
 		},
 		sqlstatement.Condition{
 			Field:    "method",
-			Operator: "=",
+			Operator: sqlstatement.OperatorEqual,
 			Value:    r.Method,
 		},
 		sqlstatement.Condition{
 			Field:    "start_id",
-			Operator: "=",
+			Operator: sqlstatement.OperatorEqual,
 			Value:    r.StartId,
 		},
 		sqlstatement.Condition{
 			Field:    "page_size",
-			Operator: "=",
+			Operator: sqlstatement.OperatorEqual,
 			Value:    r.PageSize,
 		},
 		sqlstatement.Condition{
 			Field:    "page_now",
-			Operator: ">=",
+			Operator: sqlstatement.OperatorGreaterEqual,
 			Value:    pageStart,
 		},
-	}, Operator: "AND"}
+	}, Operator: sqlstatement.OperatorAnd}
 
 	if pageEnd > 0 {
 		whereCond.Conditions = append(whereCond.Conditions, sqlstatement.Condition{
 			Field:    "page_now",
-			Operator: "<=",
+			Operator: sqlstatement.OperatorLessEqual,
 			Value:    pageEnd,
 		})
 	}
@@ -238,7 +238,7 @@ func (m *mysqlLogger) FindLogSuccessMaxPageNow(r *MysqlLogRecord, pageStart, pag
 	}
 	whereCond.Conditions = append(whereCond.Conditions, sqlstatement.Condition{
 		Field:    "status",
-		Operator: "=",
+		Operator: sqlstatement.OperatorEqual,
 		Value:    "success",
 	})
 	st := sqlstatement.Statement{}

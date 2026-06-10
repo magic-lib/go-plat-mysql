@@ -20,30 +20,30 @@ func TestGenerateWhereClause(t *testing.T) {
 			sqlstatement.Condition{
 				Field:    "b.name",
 				Value:    "test",
-				Operator: "=",
+				Operator: sqlstatement.OperatorEqual,
 			},
 			sqlstatement.Condition{
 				Field:    "a.age",
 				Value:    18,
-				Operator: "=",
+				Operator: sqlstatement.OperatorEqual,
 			},
 			sqlstatement.LogicCondition{
 				Conditions: []sqlstatement.ICondition{
 					sqlstatement.Condition{
 						Field:    "name",
 						Value:    "test",
-						Operator: "=",
+						Operator: sqlstatement.OperatorEqual,
 					},
 					sqlstatement.Condition{
 						Field:    "age",
 						Value:    18,
-						Operator: "=",
+						Operator: sqlstatement.OperatorEqual,
 					},
 				},
-				Operator: "or",
+				Operator: sqlstatement.OperatorOr,
 			},
 		},
-		Operator: "and",
+		Operator: sqlstatement.OperatorAnd,
 	})
 
 	fmt.Println(sqlStr, list)
@@ -55,33 +55,33 @@ func TestGenerateWhereClause(t *testing.T) {
 					sqlstatement.Condition{
 						Field:    "name",
 						Value:    "test",
-						Operator: "=",
+						Operator: sqlstatement.OperatorEqual,
 					},
 					sqlstatement.Condition{
 						Field:    "age",
 						Value:    18,
-						Operator: "=",
+						Operator: sqlstatement.OperatorEqual,
 					},
 				},
-				Operator: "and",
+				Operator: sqlstatement.OperatorAnd,
 			},
 			sqlstatement.LogicCondition{
 				Conditions: []sqlstatement.ICondition{
 					sqlstatement.Condition{
 						Field:    "name",
 						Value:    "test",
-						Operator: "=",
+						Operator: sqlstatement.OperatorEqual,
 					},
 					sqlstatement.Condition{
 						Field:    "age",
 						Value:    18,
-						Operator: "=",
+						Operator: sqlstatement.OperatorEqual,
 					},
 				},
-				Operator: "or",
+				Operator: sqlstatement.OperatorOr,
 			},
 		},
-		Operator: "or",
+		Operator: sqlstatement.OperatorOr,
 	})
 
 	fmt.Println(sqlStr, list)
@@ -91,10 +91,10 @@ func TestGenerateWhereClause(t *testing.T) {
 			sqlstatement.Condition{
 				Field:    "name",
 				Value:    "test",
-				Operator: "=",
+				Operator: sqlstatement.OperatorEqual,
 			},
 		},
-		Operator: "or",
+		Operator: sqlstatement.OperatorOr,
 	})
 
 	fmt.Println(sqlStr, list)
@@ -155,7 +155,7 @@ func TestInsertSql(t *testing.T) {
 		Conditions: []sqlstatement.ICondition{
 			sqlstatement.Condition{
 				Field:    "1",
-				Operator: "=",
+				Operator: sqlstatement.OperatorEqual,
 				Value:    "1",
 			},
 		},
@@ -168,7 +168,7 @@ func TestInsertSql(t *testing.T) {
 		Conditions: []sqlstatement.ICondition{
 			sqlstatement.Condition{
 				Field:    "1",
-				Operator: "=",
+				Operator: sqlstatement.OperatorEqual,
 				Value:    "1",
 			},
 		},
@@ -178,7 +178,7 @@ func TestInsertSql(t *testing.T) {
 		Conditions: []sqlstatement.ICondition{
 			sqlstatement.Condition{
 				Field:    "1",
-				Operator: "=",
+				Operator: sqlstatement.OperatorEqual,
 				Value:    "1",
 			},
 		},
@@ -276,7 +276,7 @@ func TestCondition(t *testing.T) {
 	//					Value:    workbenchType,
 	//				},
 	//			},
-	//			Operator: "AND",
+	//			Operator: sqlstatement.OperatorAnd,
 	//		},
 	//		sqlstatement.LogicCondition{
 	//			Conditions: []sqlstatement.ICondition{
@@ -291,7 +291,7 @@ func TestCondition(t *testing.T) {
 	//					Value:    "buy-off",
 	//				},
 	//			},
-	//			Operator: "AND",
+	//			Operator: sqlstatement.OperatorAnd,
 	//		},
 	//	},
 	//	Operator: "OR",
@@ -306,7 +306,7 @@ func TestCondition(t *testing.T) {
 	//		},
 	//		commCondition,
 	//	},
-	//	Operator: "AND",
+	//	Operator: sqlstatement.OperatorAnd,
 	//}
 	//pendingWhereStr := sqlstatement.LogicCondition{
 	//	Conditions: []sqlstatement.ICondition{
@@ -317,7 +317,7 @@ func TestCondition(t *testing.T) {
 	//		},
 	//		commCondition,
 	//	},
-	//	Operator: "AND",
+	//	Operator: sqlstatement.OperatorAnd,
 	//}
 	//suspendWhereStr := sqlstatement.LogicCondition{
 	//	Conditions: []sqlstatement.ICondition{
@@ -328,7 +328,7 @@ func TestCondition(t *testing.T) {
 	//		},
 	//		commCondition,
 	//	},
-	//	Operator: "AND",
+	//	Operator: sqlstatement.OperatorAnd,
 	//}
 	//resolvedWhereStr := sqlstatement.LogicCondition{
 	//	Conditions: []sqlstatement.ICondition{
@@ -346,10 +346,10 @@ func TestCondition(t *testing.T) {
 	//					Value:    "null",
 	//				},
 	//			},
-	//			Operator: "AND",
+	//			Operator: sqlstatement.OperatorAnd,
 	//		},
 	//	},
-	//	Operator: "AND",
+	//	Operator: sqlstatement.OperatorAnd,
 	//}
 	noOperatorWhereStr := sqlstatement.LogicCondition{
 		Conditions: []sqlstatement.ICondition{
@@ -362,7 +362,7 @@ func TestCondition(t *testing.T) {
 				Value: 44,
 			},
 		},
-		Operator: "AND",
+		Operator: sqlstatement.OperatorAnd,
 	}
 
 	st := new(sqlstatement.Statement)
