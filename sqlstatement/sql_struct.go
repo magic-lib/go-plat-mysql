@@ -22,6 +22,8 @@ type SqlStruct struct {
 	columnTagName             string
 }
 
+const MysqlZeroTime = "1000-01-01 00:00:00"
+
 type Option func(*SqlStruct)
 
 // NewSqlStruct 新建一个对象
@@ -156,28 +158,32 @@ func (s *SqlStruct) getDefaultValutForDateTime(v any, columnData *ColumnInfo) an
 	if columnData.ColumnDefault.Valid && columnData.ColumnDefault.String == "CURRENT_TIMESTAMP" {
 		shouldUseCurrentTime = true
 	}
-	useNow := false
+
 	vStr := conv.String(v)
 	if columnData.IsNullable {
 		if !cond.IsTime(vStr) {
 			if shouldUseCurrentTime {
-				useNow = true
+				return time.Now()
 			}
 		}
 	} else {
+		hasTimeErr := false
 		if !cond.IsTime(vStr) {
-			useNow = true
+			hasTimeErr = true
 		} else {
 			oneTime, ok := conv.Time(vStr)
 			if !ok || cond.IsTimeEmpty(oneTime) {
-				useNow = true
+				hasTimeErr = true
 			}
+		}
+		if hasTimeErr {
+			if shouldUseCurrentTime {
+				return time.Now()
+			}
+			return MysqlZeroTime
 		}
 	}
 
-	if useNow {
-		return time.Now() //当前时间
-	}
 	return v
 }
 
@@ -393,6 +399,7 @@ func (s *SqlStruct) SelectSql(selectStr string, whereCondition LogicCondition, o
 	}
 	return selectBuilder.ToSql()
 }
+
 // SelectBuilderForSelect 查询的sql语句，可以增加orderBy等其它语句
 func (s *SqlStruct) SelectBuilderForSelect(selectStr string, whereCondition LogicCondition, offset, limit int) (squirrel.SelectBuilder, error) {
 	tableName, _, _, err := s.commGetTableNameAndColumns(s.structData)

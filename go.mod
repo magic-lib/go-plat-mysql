@@ -5,8 +5,8 @@ go 1.24.3
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/magic-lib/go-plat-startupcfg v1.20260210.2-0.20260310082347-edba5f046593
-	github.com/magic-lib/go-plat-utils v1.20260210.2-0.20260610082355-a4b49b6699d6
+	github.com/magic-lib/go-plat-startupcfg v1.20260210.2-0.20260615165422-366e87aa8511
+	github.com/magic-lib/go-plat-utils v1.20260210.2-0.20260615113753-f7d11813f60c
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/samber/lo v1.52.0
 	github.com/urfave/cli/v2 v2.27.7
@@ -117,7 +117,7 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/zipkin v1.24.0 // indirect
 	go.opentelemetry.io/otel/metric v1.41.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.39.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.41.0 // indirect
 	go.opentelemetry.io/otel/trace v1.41.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
