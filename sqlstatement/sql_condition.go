@@ -92,6 +92,10 @@ const (
 	sqlSelectStr       = "SELECT %s FROM %s"
 )
 
+func SqlValue(rawSQL string, args ...interface{}) squirrel.Sqlizer {
+	return squirrel.Expr(rawSQL, args...)
+}
+
 type Statement struct {
 }
 
