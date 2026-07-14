@@ -109,7 +109,7 @@ func getSliceByMap(columnList []string, columnsMap map[string]any) ([]string, []
 
 func getSqlValues(columnName string, oneValue any) any {
 	if t, ok := oneValue.(time.Time); ok {
-		return conv.String(t)
+		return t.Format(time.DateTime)
 	}
 	return oneValue
 }
