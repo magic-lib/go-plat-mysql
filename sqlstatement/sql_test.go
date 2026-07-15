@@ -257,9 +257,6 @@ func TestInsertIgnore(t *testing.T) {
 	fmt.Println(query)
 	fmt.Println(columnDataList, err)
 }
-func TestInsertIgnore2(t *testing.T) {
-
-}
 
 func TestCondition(t *testing.T) {
 	//workbenchType := []string{"aa", "bb"}

@@ -160,15 +160,16 @@ func (s *SqlStruct) getDefaultValutForDateTime(v any, columnData *ColumnInfo) an
 	}
 
 	vStr := conv.String(v)
+	isTimeFormat := cond.IsTime(vStr)
 	if columnData.IsNullable {
-		if !cond.IsTime(vStr) {
+		if !isTimeFormat {
 			if shouldUseCurrentTime {
 				return time.Now()
 			}
 		}
 	} else {
 		hasTimeErr := false
-		if !cond.IsTime(vStr) {
+		if !isTimeFormat {
 			hasTimeErr = true
 		} else {
 			oneTime, ok := conv.Time(vStr)
