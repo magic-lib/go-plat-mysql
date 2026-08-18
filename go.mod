@@ -5,8 +5,8 @@ go 1.24.3
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/magic-lib/go-plat-startupcfg v1.20260210.2-0.20260714152739-0741167afbbc
-	github.com/magic-lib/go-plat-utils v1.20260210.2-0.20260714193243-fddc45b8ae03
+	github.com/magic-lib/go-plat-startupcfg v1.20260210.2-0.20260818104539-4975fbfc160c
+	github.com/magic-lib/go-plat-utils v1.20260210.2-0.20260818103136-e724e747dd96
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/samber/lo v1.52.0
 	github.com/urfave/cli/v2 v2.27.7
