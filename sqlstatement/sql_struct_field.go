@@ -102,7 +102,7 @@ func getTableColumnsBySqlConn(db sqlx.SqlConn, tableSchema, tableName string) (s
 	newTableSchema := removeCodeForOneColumn(tableSchema)
 	newTableName := removeCodeForOneColumn(tableName)
 
-	if newTableName == "" {
+	if db == nil || newTableName == "" {
 		return "", "", nil, fmt.Errorf("tableName is empty")
 	}
 
